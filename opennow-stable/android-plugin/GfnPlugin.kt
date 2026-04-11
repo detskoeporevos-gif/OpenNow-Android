@@ -830,6 +830,22 @@ class GfnPlugin : Plugin() {
         result.put("sessionClockShowDurationSeconds", prefs.getInt("sessionClockShowDurationSeconds", 30))
         result.put("windowWidth", 1400)
         result.put("windowHeight", 900)
+        // New upstream v0.3.4 settings fields
+        result.put("keyboardLayout", prefs.getString("keyboardLayout", "en-US"))
+        result.put("gameLanguage", prefs.getString("gameLanguage", "en_US"))
+        result.put("enableL4S", prefs.getBoolean("enableL4S", false))
+        result.put("showStatsOnLaunch", prefs.getBoolean("showStatsOnLaunch", false))
+        result.put("sessionCounterEnabled", prefs.getBoolean("sessionCounterEnabled", true))
+        result.put("mouseAcceleration", prefs.getInt("mouseAcceleration", 1))
+        result.put("aspectRatio", prefs.getString("aspectRatio", "16:9"))
+        result.put("shortcutScreenshot", prefs.getString("shortcutScreenshot", ""))
+        result.put("shortcutToggleRecording", prefs.getString("shortcutToggleRecording", ""))
+        result.put("controllerMode", prefs.getBoolean("controllerMode", false))
+        result.put("controllerUiSounds", prefs.getBoolean("controllerUiSounds", false))
+        result.put("autoLoadControllerLibrary", prefs.getBoolean("autoLoadControllerLibrary", false))
+        result.put("controllerBackgroundAnimations", prefs.getBoolean("controllerBackgroundAnimations", false))
+        result.put("autoFullScreen", prefs.getBoolean("autoFullScreen", false))
+        result.put("favoriteGameIds", com.getcapacitor.JSArray())
         call.resolve(result)
     }
 
@@ -839,9 +855,10 @@ class GfnPlugin : Plugin() {
         val prefs = activity.getSharedPreferences("opennow_settings", android.content.Context.MODE_PRIVATE).edit()
 
         when (key) {
-            "fps", "maxBitrateMbps", "sessionClockShowEveryMinutes", "sessionClockShowDurationSeconds" ->
+            "fps", "maxBitrateMbps", "sessionClockShowEveryMinutes", "sessionClockShowDurationSeconds", "mouseAcceleration" ->
                 prefs.putInt(key, call.getInt("value") ?: 0)
-            "clipboardPaste", "hideStreamButtons" ->
+            "clipboardPaste", "hideStreamButtons", "enableL4S", "showStatsOnLaunch", "sessionCounterEnabled",
+            "controllerMode", "controllerUiSounds", "autoLoadControllerLibrary", "controllerBackgroundAnimations", "autoFullScreen" ->
                 prefs.putBoolean(key, call.getBoolean("value") ?: false)
             "mouseSensitivity" ->
                 prefs.putFloat(key, (call.getFloat("value") ?: 1f))

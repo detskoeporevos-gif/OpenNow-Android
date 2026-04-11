@@ -29,6 +29,7 @@ interface StreamViewProps {
   sessionElapsedSeconds: number;
   sessionClockShowEveryMinutes: number;
   sessionClockShowDurationSeconds: number;
+  sessionCounterEnabled?: boolean;
   streamWarning: {
     code: 1 | 2 | 3;
     message: string;
@@ -37,6 +38,7 @@ interface StreamViewProps {
   } | null;
   isConnecting: boolean;
   gameTitle: string;
+  negotiatedStreamProfile?: { resolution: string; fps: number } | null;
   onToggleFullscreen: () => void;
   onConfirmExit: () => void;
   onCancelExit: () => void;
@@ -108,9 +110,11 @@ export function StreamView({
   sessionElapsedSeconds,
   sessionClockShowEveryMinutes,
   sessionClockShowDurationSeconds,
+  sessionCounterEnabled = true,
   streamWarning,
   isConnecting,
   gameTitle,
+  negotiatedStreamProfile,
   onToggleFullscreen,
   onConfirmExit,
   onCancelExit,
@@ -402,19 +406,38 @@ export function StreamView({
         </div>
       )}
 
-      {/* Hold-Esc release indicator (appears after 1s hold) */}
+      {/* Hold-Esc release indicator — circular radial countdown */}
       {escHoldReleaseIndicator.visible && !isConnecting && (
         <>
           <div className="sv-esc-hold-backdrop" />
           <div className="sv-esc-hold" title="Keep holding Escape to release mouse lock">
             <div className="sv-esc-hold-title">Hold Escape to Release Mouse</div>
-            <div className="sv-esc-hold-head">
-              <span>Keep holding…</span>
-              <span>{escHoldSecondsLeft}s</span>
+            {/* Circular radial progress indicator */}
+            <div
+              className="sv-esc-hold-circle"
+              role="progressbar"
+              aria-valuenow={escHoldProgress}
+              aria-valuemin={0}
+              aria-valuemax={1}
+            >
+              <svg viewBox="0 0 100 100" className="sv-esc-hold-svg">
+                <circle className="sv-esc-hold-ring" cx="50" cy="50" r="42" />
+                <circle
+                  className="sv-esc-hold-fill"
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  style={{
+                    strokeDasharray: 264,
+                    strokeDashoffset: 264 * (1 - escHoldProgress),
+                    transform: "rotate(-90deg)",
+                    transformOrigin: "50px 50px",
+                  }}
+                />
+              </svg>
+              <div className="sv-esc-hold-count">{escHoldSecondsLeft}</div>
             </div>
-            <div className="sv-esc-hold-track">
-              <span className="sv-esc-hold-fill" style={{ transform: `scaleX(${escHoldProgress})` }} />
-            </div>
+            <div className="sv-esc-hold-sub">Keep holding…</div>
           </div>
         </>
       )}

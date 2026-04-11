@@ -5,6 +5,9 @@ import { getPlatformApi } from "./platform/index";
 import { isAndroid } from "./platform/detect";  // isAndroid is now a function -- call it as isAndroid()
 import { TouchGamepad } from "./components/TouchGamepad";
 import { TouchInputHandler } from "./gfn/touchInput";
+import { createStreamDiagnosticsStore, type StreamDiagnosticsStore } from "./utils/streamDiagnosticsStore";
+import { useElapsedSeconds } from "./utils/useElapsedSeconds";
+import { usePlaytime } from "./utils/usePlaytime";
 
 import type {
   ActiveSessionInfo,
@@ -18,6 +21,7 @@ import type {
   SubscriptionInfo,
   StreamRegion,
   VideoCodec,
+  ColorQuality,
 } from "@shared/gfn";
 
 import {
@@ -291,6 +295,11 @@ export function App(): JSX.Element {
     sessionClockShowDurationSeconds: 30,
     windowWidth: 1400,
     windowHeight: 900,
+    keyboardLayout: "en-US",
+    gameLanguage: "en_US",
+    enableL4S: false,
+    showStatsOnLaunch: false,
+    sessionCounterEnabled: true,
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [regions, setRegions] = useState<StreamRegion[]>([]);
@@ -299,8 +308,11 @@ export function App(): JSX.Element {
   // Stream State
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
-  const [diagnostics, setDiagnostics] = useState<StreamDiagnostics>(defaultDiagnostics());
+  const diagnosticsStoreRef = useRef<StreamDiagnosticsStore>(createStreamDiagnosticsStore());
+  const diagnosticsStore = diagnosticsStoreRef.current;
+  const { diagnostics, hasReceivedFrames } = useStreamDiagnosticsStore(diagnosticsStore);
   const [showStatsOverlay, setShowStatsOverlay] = useState(true);
+  const [negotiatedStreamProfile, setNegotiatedStreamProfile] = useState<{ resolution: string; fps: number } | null>(null);
   const [antiAfkEnabled, setAntiAfkEnabled] = useState(false);
   const [escHoldReleaseIndicator, setEscHoldReleaseIndicator] = useState<{ visible: boolean; progress: number }>({
     visible: false,
@@ -313,8 +325,15 @@ export function App(): JSX.Element {
   const [navbarActiveSession, setNavbarActiveSession] = useState<ActiveSessionInfo | null>(null);
   const [isResumingNavbarSession, setIsResumingNavbarSession] = useState(false);
   const [launchError, setLaunchError] = useState<LaunchErrorState | null>(null);
-  const [sessionStartedAtMs, setSessionStartedAtMs] = useState<number | null>(null);
-  const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState(0);
+  const [streamStartedAtMs, setStreamStartedAtMs] = useState<number | null>(null);
+  const sessionCounterEnabled = settings.sessionCounterEnabled ?? true;
+  const sessionElapsedSeconds = useElapsedSeconds(
+    streamStartedAtMs,
+    streamStatus === "streaming" && hasReceivedFrames && sessionCounterEnabled
+  );
+
+  // Playtime tracking
+  const { startSession: startPlaytimeSession, endSession: endPlaytimeSession } = usePlaytime();
   const [streamWarning, setStreamWarning] = useState<StreamWarningState | null>(null);
 
   const handleControllerPageNavigate = useCallback((direction: "prev" | "next"): void => {
@@ -699,21 +718,7 @@ export function App(): JSX.Element {
     }
   }, [currentPage, streamStatus]);
 
-  useEffect(() => {
-    if (streamStatus === "idle" || sessionStartedAtMs === null) {
-      setSessionElapsedSeconds(0);
-      return;
-    }
-
-    const updateElapsed = () => {
-      const elapsed = Math.max(0, Math.floor((Date.now() - sessionStartedAtMs) / 1000));
-      setSessionElapsedSeconds(elapsed);
-    };
-
-    updateElapsed();
-    const timer = window.setInterval(updateElapsed, 1000);
-    return () => window.clearInterval(timer);
-  }, [sessionStartedAtMs, streamStatus]);
+  // Session timer is now handled by useElapsedSeconds hook above
 
   useEffect(() => {
     if (!streamWarning) return;
@@ -750,7 +755,18 @@ export function App(): JSX.Element {
               microphoneMode: settings.microphoneMode,
               microphoneDeviceId: settings.microphoneDeviceId || undefined,
               onLog: (line: string) => console.log(`[WebRTC] ${line}`),
-              onStats: (stats) => setDiagnostics(stats),
+              onStats: (stats) => {
+                diagnosticsStore.set(stats);
+                // Set stream start time on first decoded frame
+                if (stats.connectionState === "connected" && stats.framesDecoded > 0) {
+                  setStreamStartedAtMs((current) => {
+                    if (current === null) {
+                      return Date.now();
+                    }
+                    return current;
+                  });
+                }
+              },
               onEscHoldProgress: (visible, progress) => {
                 setEscHoldReleaseIndicator({ visible, progress });
               },
@@ -810,10 +826,10 @@ export function App(): JSX.Element {
           setStreamingGame(null);
           setLaunchError(null);
           setSessionStartedAtMs(null);
-          setSessionElapsedSeconds(0);
+          setNegotiatedStreamProfile(null);
           setStreamWarning(null);
           setEscHoldReleaseIndicator({ visible: false, progress: 0 });
-          setDiagnostics(defaultDiagnostics());
+          diagnosticsStoreRef.current.reset();
           launchInFlightRef.current = false;
         } else if (event.type === "error") {
           console.error("Signaling error:", event.message);
@@ -982,8 +998,8 @@ export function App(): JSX.Element {
       setStreamStatus(next);
     };
 
-    setSessionStartedAtMs(Date.now());
-    setSessionElapsedSeconds(0);
+    setStreamStartedAtMs(null); // Reset - will be set when first frames decoded
+    setNegotiatedStreamProfile(null);
     setStreamWarning(null);
     setLaunchError(null);
     setStreamingGame(game);
@@ -991,9 +1007,22 @@ export function App(): JSX.Element {
     setQueuePosition(undefined);
     setQueueEta(undefined);
 
+    // Initialize stats overlay visibility from settings
+    setShowStatsOverlay(settings.showStatsOnLaunch ?? false);
+
+    // Start playtime tracking
+    startPlaytimeSession(game.id);
+
     try {
       const token = authSession?.tokens.idToken ?? authSession?.tokens.accessToken;
       const selectedVariantId = variantByGameId[game.id] ?? defaultVariantId(game);
+
+      // H264 + 10-bit black screen prevention
+      let streamColorQuality = settings.colorQuality;
+      if (settings.codec === "H264" && settings.colorQuality !== "8bit_420") {
+        console.warn("[App] H264 codec selected with non-8bit color quality - forcing 8bit_420 to prevent black screen");
+        streamColorQuality = "8bit_420";
+      }
 
       // Resolve appId
       let appId: string | null = null;
@@ -1066,7 +1095,10 @@ export function App(): JSX.Element {
           fps: settings.fps,
           maxBitrateMbps: settings.maxBitrateMbps,
           codec: settings.codec,
-          colorQuality: settings.colorQuality,
+          colorQuality: streamColorQuality,
+          keyboardLayout: settings.keyboardLayout || "en-US",
+          gameLanguage: settings.gameLanguage || "en_US",
+          enableL4S: settings.enableL4S ?? false,
         },
       });
 

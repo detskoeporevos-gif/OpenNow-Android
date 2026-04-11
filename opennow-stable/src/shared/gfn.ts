@@ -49,6 +49,22 @@ export interface Settings {
   sessionClockShowDurationSeconds: number;
   windowWidth: number;
   windowHeight: number;
+  // v0.3.4 upstream additions
+  keyboardLayout?: string;
+  gameLanguage?: string;
+  enableL4S?: boolean;
+  showStatsOnLaunch?: boolean;
+  sessionCounterEnabled?: boolean;
+  mouseAcceleration?: number;
+  aspectRatio?: string;
+  shortcutScreenshot?: string;
+  shortcutToggleRecording?: string;
+  controllerMode?: boolean;
+  controllerUiSounds?: boolean;
+  autoLoadControllerLibrary?: boolean;
+  controllerBackgroundAnimations?: boolean;
+  autoFullScreen?: boolean;
+  favoriteGameIds?: string[];
 }
 
 export interface LoginProvider {
@@ -194,6 +210,10 @@ export interface StreamSettings {
   maxBitrateMbps: number;
   codec: VideoCodec;
   colorQuality: ColorQuality;
+  // v0.3.4 upstream additions
+  keyboardLayout?: string;
+  gameLanguage?: string;
+  enableL4S?: boolean;
 }
 
 export interface SessionCreateRequest {
@@ -213,6 +233,8 @@ export interface SessionPollRequest {
   serverIp?: string;
   zone: string;
   sessionId: string;
+  clientId?: string;
+  deviceId?: string;
 }
 
 export interface SessionStopRequest {
@@ -221,6 +243,8 @@ export interface SessionStopRequest {
   serverIp?: string;
   zone: string;
   sessionId: string;
+  clientId?: string;
+  deviceId?: string;
 }
 
 export interface IceServer {
@@ -247,6 +271,10 @@ export interface SessionInfo {
   gpuType?: string;
   iceServers: IceServer[];
   mediaConnectionInfo?: MediaConnectionInfo;
+  // v0.3.4 upstream additions
+  clientId?: string;
+  deviceId?: string;
+  negotiatedStreamProfile?: { resolution: string; fps: number };
 }
 
 /** Information about an active session from getActiveSessions */
@@ -259,6 +287,9 @@ export interface ActiveSessionInfo {
   signalingUrl?: string;
   resolution?: string;
   fps?: number;
+  // v0.3.4 upstream additions
+  clientId?: string;
+  deviceId?: string;
 }
 
 /** Request to claim/resume an existing session */
@@ -332,4 +363,6 @@ export interface OpenNowApi {
   getSettings(): Promise<Settings>;
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): Promise<void>;
   resetSettings(): Promise<Settings>;
+  /** Set device screen orientation */
+  setOrientation(mode: string): Promise<void>;
 }

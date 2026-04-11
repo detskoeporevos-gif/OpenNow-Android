@@ -88,6 +88,39 @@ const microphoneModeOptions: Array<{ value: MicrophoneMode; label: string }> = [
   { value: "voice-activity", label: "Voice Activity" },
 ];
 
+const keyboardLayoutOptions = [
+  { value: "en-US", label: "English (US)" },
+  { value: "en-GB", label: "English (UK)" },
+  { value: "de-DE", label: "German" },
+  { value: "fr-FR", label: "French" },
+  { value: "es-ES", label: "Spanish" },
+  { value: "it-IT", label: "Italian" },
+  { value: "pt-BR", label: "Portuguese (Brazil)" },
+  { value: "ru-RU", label: "Russian" },
+  { value: "ja-JP", label: "Japanese" },
+  { value: "ko-KR", label: "Korean" },
+  { value: "zh-CN", label: "Chinese (Simplified)" },
+  { value: "zh-TW", label: "Chinese (Traditional)" },
+  { value: "pl-PL", label: "Polish" },
+  { value: "tr-TR", label: "Turkish" },
+];
+
+const gameLanguageOptions = [
+  { value: "en_US", label: "English (US)" },
+  { value: "de_DE", label: "German" },
+  { value: "fr_FR", label: "French" },
+  { value: "es_ES", label: "Spanish" },
+  { value: "it_IT", label: "Italian" },
+  { value: "pt_BR", label: "Portuguese (Brazil)" },
+  { value: "ru_RU", label: "Russian" },
+  { value: "ja_JP", label: "Japanese" },
+  { value: "ko_KR", label: "Korean" },
+  { value: "zh_CN", label: "Chinese (Simplified)" },
+  { value: "zh_TW", label: "Chinese (Traditional)" },
+  { value: "pl_PL", label: "Polish" },
+  { value: "tr_TR", label: "Turkish" },
+];
+
 /* ── Aspect ratio helpers ─────────────────────────────────────────── */
 
 const ASPECT_RATIO_ORDER = [
@@ -640,13 +673,15 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
     [onSettingChange]
   );
 
-  /** Change color quality, auto-switching codec to H265 if the mode requires HEVC */
+  /** Change color quality, auto-switching codec to H265 if the mode requires HEVC.
+   * Also handles H264 + non-8bit_420 black screen prevention. */
   const handleColorQualityChange = useCallback(
     (cq: ColorQuality) => {
-      handleChange("colorQuality", cq);
+      // If selecting non-8bit_420 and H264 is selected, auto-switch to H265
       if (colorQualityRequiresHevc(cq) && settings.codec === "H264") {
         handleChange("codec", "H265");
       }
+      handleChange("colorQuality", cq);
     },
     [handleChange, settings.codec]
   );
@@ -919,7 +954,13 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
                   <button
                     key={codec}
                     className={`settings-chip ${settings.codec === codec ? "active" : ""}`}
-                    onClick={() => handleChange("codec", codec)}
+                    onClick={() => {
+                      handleChange("codec", codec);
+                      // If switching to H264 and color quality is not 8bit_420, reset it
+                      if (codec === "H264" && settings.colorQuality !== "8bit_420") {
+                        handleChange("colorQuality", "8bit_420");
+                      }
+                    }}
                   >
                     {codec}
                   </button>
@@ -984,6 +1025,27 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
               {colorQualityRequiresHevc(settings.colorQuality) && settings.codec === "H264" && (
                 <span className="settings-input-hint">This mode requires H265 or AV1. Codec will be auto-switched.</span>
               )}
+              {settings.codec === "H264" && settings.colorQuality !== "8bit_420" && (
+                <span className="settings-input-hint settings-input-hint--warn">
+                  H264 only supports 8-bit 4:2:0. Color quality has been reset.
+                </span>
+              )}
+            </div>
+
+            {/* L4S Toggle */}
+            <div className="settings-row">
+              <label className="settings-label">
+                Low Latency (L4S) — Experimental
+                <span className="settings-hint">Enable RFC 8290 L4S signaling for reduced network latency.</span>
+              </label>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.enableL4S || false}
+                  onChange={(e) => handleChange("enableL4S", e.target.checked)}
+                />
+                <span className="settings-toggle-track" />
+              </label>
             </div>
 
             {/* Bitrate slider */}
@@ -1283,6 +1345,36 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
               </label>
             </div>
 
+            <div className="settings-row">
+              <label className="settings-label">
+                Show Stats on Launch
+                <span className="settings-hint">Automatically show the stats overlay when stream starts.</span>
+              </label>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.showStatsOnLaunch || false}
+                  onChange={(e) => handleChange("showStatsOnLaunch", e.target.checked)}
+                />
+                <span className="settings-toggle-track" />
+              </label>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">
+                Show Session Counter
+                <span className="settings-hint">Display elapsed session time while streaming.</span>
+              </label>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.sessionCounterEnabled !== false}
+                  onChange={(e) => handleChange("sessionCounterEnabled", e.target.checked)}
+                />
+                <span className="settings-toggle-track" />
+              </label>
+            </div>
+
             <div className="settings-row settings-row--column">
               <div className="settings-row-top">
                 <label className="settings-label">Shortcuts</label>
@@ -1382,6 +1474,54 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
                   {shortcutExamples}. Stop: {formatShortcutForDisplay(settings.shortcutStopStream, isMac)}. Mic: {formatShortcutForDisplay(settings.shortcutToggleMicrophone, isMac)}.
                 </span>
               )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── Stream Input ───────────────────────────────────── */}
+        <section className="settings-section">
+          <div className="settings-section-header">
+            <h2>Input</h2>
+          </div>
+          <div className="settings-rows">
+            <div className="settings-row">
+              <label className="settings-label">
+                Keyboard Layout
+                <span className="settings-hint">Keyboard layout used during stream.</span>
+              </label>
+              <div className="settings-dropdown">
+                <select
+                  className="settings-select"
+                  value={settings.keyboardLayout || "en-US"}
+                  onChange={(e) => handleChange("keyboardLayout", e.target.value)}
+                >
+                  {keyboardLayoutOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">
+                Game Language
+                <span className="settings-hint">Language preference for the game.</span>
+              </label>
+              <div className="settings-dropdown">
+                <select
+                  className="settings-select"
+                  value={settings.gameLanguage || "en_US"}
+                  onChange={(e) => handleChange("gameLanguage", e.target.value)}
+                >
+                  {gameLanguageOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
         </section>
