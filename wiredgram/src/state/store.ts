@@ -474,6 +474,12 @@ export async function downloadMedia(chatId: string, messageId: string): Promise<
   }));
 }
 
+/** Upload a Telegram avatar. Returns true when the server accepted it. */
+export async function uploadTelegramAvatar(file: File): Promise<boolean> {
+  if (state.settings.connection !== "telegram") return false;
+  return tg.tgUploadAvatar(file);
+}
+
 async function sendTelegramMessage(chatId: string, text: string, media?: MediaRef): Promise<void> {
   const trimmed = text.trim();
   const temp: Message = {

@@ -31,8 +31,22 @@ function previewText(chat: Chat, message: Message | undefined): JSX.Element {
 }
 
 export function ChatsScreen(): JSX.Element {
-  const { chats, search, profile } = useStore();
+  const { chats, search, profile, settings, tgStage } = useStore();
   const unread = totalUnread(chats);
+  const subtitle =
+    settings.connection === "telegram"
+      ? tgStage === "ready"
+        ? unread > 0
+          ? `Telegram · ${unread} новых`
+          : "Telegram · всё прочитано"
+        : tgStage === "connecting"
+          ? "Подключаемся к Telegram…"
+          : tgStage === "error"
+            ? "Нет связи с Telegram"
+            : "Вход в Telegram"
+      : unread > 0
+        ? `${unread} новых сообщений`
+        : "всё прочитано";
 
   const visible = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -56,7 +70,7 @@ export function ChatsScreen(): JSX.Element {
           </span>
           <div className="topbar__title">
             <strong>WiredGram</strong>
-            <span>{unread > 0 ? `${unread} новых сообщений` : "всё прочитано"}</span>
+            <span>{subtitle}</span>
           </div>
         </div>
         <button className="icon-btn" onClick={() => go({ name: "profile" })} aria-label="Профиль">

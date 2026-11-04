@@ -112,6 +112,7 @@ interface TgClient {
   downloadMedia(message: TgRawMessage): Promise<unknown>;
   downloadProfilePhoto(entity: TgEntity, params: { isBig?: boolean }): Promise<unknown>;
   addEventHandler(handler: (event: unknown) => void, builder: unknown): void;
+  uploadProfilePhoto(params: { file: File }): Promise<unknown>;
   logOut(): Promise<unknown>;
 }
 
@@ -545,6 +546,17 @@ export async function tgMyAvatar(): Promise<string | undefined> {
     return stored.blobId;
   } catch {
     return undefined;
+  }
+}
+
+/** Upload a new profile picture to Telegram. */
+export async function tgUploadAvatar(file: File): Promise<boolean> {
+  if (!client || !authorized) return false;
+  try {
+    await client.uploadProfilePhoto({ file });
+    return true;
+  } catch {
+    return false;
   }
 }
 

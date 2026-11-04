@@ -88,7 +88,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --no-daemon --console=plain 2>&1 | tee /tmp/gradle-build.log
+          ./gradlew assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee /tmp/gradle-build.log
 
       - name: Report Gradle failure
         if: failure()
@@ -100,6 +100,15 @@ jobs:
           [ -n "$REASON" ] || REASON=$(tail -40 "$LOG" | tr '\n' ' ' | sed 's/[[:space:]]\{1,\}/ /g' | cut -c1-900)
           echo "::error title=Gradle error::${REASON}"
           echo "Gradle error: ${REASON}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Gradle log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gradle-log
+          path: /tmp/gradle-build.log
+          if-no-files-found: ignore
+          retention-days: 5
 
       - name: Collect APK
         run: |

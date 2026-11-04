@@ -13,6 +13,7 @@ import {
   toast,
   updateProfile,
   updateWallpaper,
+  uploadTelegramAvatar,
   useStore,
 } from "../state/store";
 import type { WallpaperKind } from "../types";
@@ -55,8 +56,9 @@ export function ProfileScreen(): JSX.Element {
     try {
       const media = await storeFile(file);
       updateProfile({ avatarMediaId: media.blobId });
+      if (await uploadTelegramAvatar(file)) toast("Аватар обновлён в Telegram", "ok");
       await refreshStorage();
-      toast("Аватар обновлён", "ok");
+      if (settings.connection !== "telegram") toast("Аватар обновлён", "ok");
     } catch {
       toast("Не удалось загрузить изображение", "error");
     } finally {
