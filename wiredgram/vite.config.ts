@@ -11,6 +11,8 @@ export default defineConfig({
     strictPort: true,
     // Preview hosts are proxied (e.g. 5173-<sandbox>.e2b.app) — accept any host.
     allowedHosts: true,
+    // The Capacitor project contains a copy of dist/ — don't reload on it.
+    watch: { ignored: ["**/android/**"] },
   },
   preview: {
     host: "0.0.0.0",
@@ -22,6 +24,8 @@ export default defineConfig({
     target: "es2020",
     cssCodeSplit: false,
     reportCompressedSize: true,
+    // teleproto is intentionally a lazy chunk at ~1.5 MB raw.
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         manualChunks: undefined,
