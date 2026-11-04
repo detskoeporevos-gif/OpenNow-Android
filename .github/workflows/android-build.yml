@@ -144,18 +144,42 @@ jobs:
 
       - name: Build debug APK
         working-directory: opennow-stable/android
+        shell: bash
         run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace \
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --console=plain \
             -PopenNowVersionCode=${{ github.run_number }} \
-            -PopenNowVersionName="${{ env.OPENNOW_VERSION_NAME }}"
+            -PopenNowVersionName="${{ env.OPENNOW_VERSION_NAME }}" \
+            2>&1 | tee /tmp/gradle-debug.log
 
       - name: Build release APK
         if: ${{ github.event_name != 'pull_request' && (github.event_name != 'workflow_dispatch' || inputs.build_release) }}
         working-directory: opennow-stable/android
+        shell: bash
         run: |
-          ./gradlew assembleRelease --no-daemon --stacktrace \
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon --console=plain \
             -PopenNowVersionCode=${{ github.run_number }} \
-            -PopenNowVersionName="${{ env.OPENNOW_VERSION_NAME }}"
+            -PopenNowVersionName="${{ env.OPENNOW_VERSION_NAME }}" \
+            2>&1 | tee /tmp/gradle-release.log
+
+      # Surfaces the Gradle error as an annotation, which is readable from the
+      # API and the run summary instead of digging through megabytes of log.
+      - name: Report Gradle failure
+        if: failure()
+        shell: bash
+        run: |
+          LOG=$(ls -t /tmp/gradle-*.log 2>/dev/null | head -1)
+          if [ -z "$LOG" ] || [ ! -f "$LOG" ]; then
+            echo "::error title=Build failed::No gradle log was produced."
+            exit 0
+          fi
+          REASON=$(grep -A 14 -i "what went wrong" "$LOG" | tr '\n' ' ' | sed 's/[[:space:]]\{1,\}/ /g' | cut -c1-900)
+          if [ -z "$REASON" ]; then
+            REASON=$(tail -40 "$LOG" | tr '\n' ' ' | sed 's/[[:space:]]\{1,\}/ /g' | cut -c1-900)
+          fi
+          echo "::error title=Gradle error::${REASON}"
+          echo "Gradle error: ${REASON}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect artifacts
         run: |
