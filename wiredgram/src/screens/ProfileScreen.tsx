@@ -242,7 +242,7 @@ export function ProfileScreen(): JSX.Element {
             </div>
 
             <Slider
-              label="Прозрачность фона"
+              label="Видимость фона"
               min={5}
               max={100}
               value={Math.round(wallpaper.opacity * 100)}

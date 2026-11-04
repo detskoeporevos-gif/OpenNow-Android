@@ -34,6 +34,12 @@ export function App(): JSX.Element {
     root.style.fontSize = settings.largeText ? "17.5px" : "16px";
   }, [settings.largeText]);
 
+  /* keep the mobile status bar in sync with the palette */
+  useEffect(() => {
+    const color = settings.theme === "light" ? "#f5f6fa" : settings.theme === "amoled" ? "#000000" : "#07070a";
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", color);
+  }, [settings.theme]);
+
   const style = {
     "--accent": settings.accent,
     "--text-scale": settings.largeText ? "1.08" : "1",
