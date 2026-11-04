@@ -96,10 +96,17 @@ jobs:
         run: |
           LOG=/tmp/gradle-build.log
           [ -f "$LOG" ] || exit 0
-          REASON=$(grep -A 14 -i "what went wrong" "$LOG" | tr '\n' ' ' | sed 's/[[:space:]]\{1,\}/ /g' | cut -c1-900)
-          [ -n "$REASON" ] || REASON=$(tail -40 "$LOG" | tr '\n' ' ' | sed 's/[[:space:]]\{1,\}/ /g' | cut -c1-900)
-          echo "::error title=Gradle error::${REASON}"
-          echo "Gradle error: ${REASON}" >> "$GITHUB_STEP_SUMMARY"
+          # Full "What went wrong" + the first stack frames, right in the annotation.
+          DETAIL=$(grep -A 60 -i "what went wrong" "$LOG" | tr '\n' '~' | sed 's/~/\n/g' | head -60)
+          [ -n "$DETAIL" ] || DETAIL=$(tail -60 "$LOG")
+          echo "::error title=Gradle error::$(printf '%s' "$DETAIL" | tr '\n' ' ' | sed 's/[[:space:]]\{1,\}/ /g' | cut -c1-12000)"
+          {
+            echo "### Gradle failure"
+            echo ""
+            echo '```'
+            printf '%s\n' "$DETAIL" | cut -c1-4000
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Gradle log on failure
         if: failure()
