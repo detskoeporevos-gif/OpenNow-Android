@@ -1,4 +1,4 @@
-import { Globe, Save, Check, Loader, Zap, Mic, User, LogOut } from "lucide-react";
+import { Globe, Save, Check, Loader, Zap, Mic, User, LogOut, Gamepad2, Move, RotateCcw } from "lucide-react";
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type { JSX } from "react";
 
@@ -15,6 +15,20 @@ import type {
 } from "@shared/gfn";
 import { colorQualityRequiresHevc } from "@shared/gfn";
 import { formatShortcutForDisplay, normalizeShortcut } from "../shortcuts";
+import { TouchGamepad } from "./TouchGamepad";
+import type { GfnWebRtcClient } from "../gfn/webrtcClient";
+import {
+  DEFAULT_TOUCH_CONTROLS,
+  TOUCH_CLUSTER_IDS,
+  TOUCH_HAPTIC_OPTIONS,
+  TOUCH_LAYOUTS,
+  TOUCH_THEMES,
+  readTouchControls,
+  resolvePositions,
+  visibleClusters,
+  type TouchClusterId,
+  type TouchLayoutId,
+} from "../touchControls";
 
 interface SettingsPageProps {
   settings: Settings;
@@ -477,6 +491,91 @@ function getTierDisplay(tier: string): { label: string; className: string } {
   return { label: "Free", className: "tier-free" };
 }
 
+/* ── Touch controls helpers ─────────────────────────────────────── */
+
+const TOUCH_DOT_SIZES: Record<TouchClusterId, { w: number; h: number }> = {
+  dpad: { w: 15, h: 15 },
+  face: { w: 15, h: 15 },
+  leftStick: { w: 16, h: 16 },
+  rightStick: { w: 16, h: 16 },
+  shouldersLeft: { w: 18, h: 6 },
+  shouldersRight: { w: 18, h: 6 },
+  centre: { w: 12, h: 5 },
+};
+
+/** Tiny schematic of a layout preset, used on the layout cards. */
+function TouchLayoutThumb({ layoutId }: { layoutId: TouchLayoutId }): JSX.Element {
+  const config = useMemo(
+    () => ({ ...DEFAULT_TOUCH_CONTROLS, layout: layoutId, customPositions: null }),
+    [layoutId],
+  );
+  const positions = resolvePositions(config);
+  const shown = visibleClusters(config);
+  const theme = TOUCH_THEMES.find((t) => t.id === DEFAULT_TOUCH_CONTROLS.theme) ?? TOUCH_THEMES[0];
+
+  return (
+    <span className="settings-touch-thumb">
+      {TOUCH_CLUSTER_IDS.filter((id) => shown[id]).map((id) => {
+        const size = TOUCH_DOT_SIZES[id];
+        return (
+          <span
+            key={id}
+            className="settings-touch-thumb-dot"
+            style={{
+              left: `${positions[id].x}%`,
+              top: `${positions[id].y}%`,
+              width: `${size.w}px`,
+              height: `${size.h}px`,
+              borderRadius: id === "shouldersLeft" || id === "shouldersRight" ? "3px" : "50%",
+              background: theme.vars.accent,
+            }}
+          />
+        );
+      })}
+    </span>
+  );
+}
+
+const FACE_STYLE_OPTIONS = [
+  { value: "xbox", label: "Xbox (A / B / X / Y)" },
+  { value: "playstation", label: "PlayStation (✕ ○ □ △)" },
+  { value: "nintendo", label: "Nintendo (A / B / X / Y)" },
+  { value: "letters", label: "Plain letters" },
+];
+
+const TRIGGER_STYLE_OPTIONS = [
+  { value: "analog", label: "Analog (drag for pressure)" },
+  { value: "buttons", label: "Digital (tap)" },
+];
+
+/** Every setting owned by the touch-controller feature -- used by Reset. */
+const TOUCH_SETTING_DEFS: Array<{ key: keyof Settings; value: unknown }> = [
+  { key: "touchControlsEnabled", value: DEFAULT_TOUCH_CONTROLS.enabled },
+  { key: "touchLayout", value: DEFAULT_TOUCH_CONTROLS.layout },
+  { key: "touchTheme", value: DEFAULT_TOUCH_CONTROLS.theme },
+  { key: "touchFaceStyle", value: DEFAULT_TOUCH_CONTROLS.faceStyle },
+  { key: "touchTriggerStyle", value: DEFAULT_TOUCH_CONTROLS.triggerStyle },
+  { key: "touchHaptics", value: DEFAULT_TOUCH_CONTROLS.haptics },
+  { key: "touchScalePercent", value: 100 },
+  { key: "touchOpacityPercent", value: 85 },
+  { key: "touchButtonSizePercent", value: 100 },
+  { key: "touchStickSizePercent", value: 100 },
+  { key: "touchDeadzonePercent", value: 12 },
+  { key: "touchSensitivityPercent", value: 100 },
+  { key: "touchInvertLeftY", value: false },
+  { key: "touchInvertRightY", value: false },
+  { key: "touchSwapSticks", value: false },
+  { key: "touchLeftHanded", value: false },
+  { key: "touchShowDpad", value: true },
+  { key: "touchShowFace", value: true },
+  { key: "touchShowShoulders", value: true },
+  { key: "touchShowCentre", value: true },
+  { key: "touchShowLeftStick", value: true },
+  { key: "touchShowRightStick", value: true },
+  { key: "touchShowTuneButton", value: true },
+  { key: "touchCustomPositions", value: "" },
+];
+
 export function SettingsPage({ settings, regions, onSettingChange, user, subscription, onLogout }: SettingsPageProps): JSX.Element {
   const tierInfo = user ? getTierDisplay(user.membershipTier) : null;
   const [savedIndicator, setSavedIndicator] = useState(false);
@@ -672,6 +771,16 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
     },
     [onSettingChange]
   );
+
+  // ── Touch controls ─────────────────────────────────────────────
+  const touchConfig = useMemo(() => readTouchControls(settings), [settings]);
+  const touchPreviewClient = useRef<GfnWebRtcClient | null>(null);
+  const resetTouchControls = useCallback(() => {
+    const apply = handleChange as unknown as (key: keyof Settings, value: unknown) => void;
+    for (const def of TOUCH_SETTING_DEFS) {
+      apply(def.key, def.value);
+    }
+  }, [handleChange]);
 
   /** Change color quality, auto-switching codec to H265 if the mode requires HEVC.
    * Also handles H264 + non-8bit_420 black screen prevention. */
@@ -1521,6 +1630,295 @@ export function SettingsPage({ settings, regions, onSettingChange, user, subscri
                     </option>
                   ))}
                 </select>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Touch controls ─────────────────────────────── */}
+        <section className="settings-section">
+          <div className="settings-section-header">
+            <h2>
+              <Gamepad2 size={16} /> Touch controls
+            </h2>
+            <button type="button" className="settings-shortcut-reset-btn" onClick={resetTouchControls}>
+              <RotateCcw size={12} /> Reset
+            </button>
+          </div>
+
+          <div className="settings-rows">
+            <div className="settings-row">
+              <label className="settings-label">
+                On-screen controller
+                <span className="settings-hint">
+                  Virtual gamepad drawn over the stream on Android and other touch devices.
+                </span>
+              </label>
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.touchControlsEnabled ?? true}
+                  onChange={(e) => handleChange("touchControlsEnabled", e.target.checked)}
+                />
+                <span className="settings-toggle-track" />
+              </label>
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <div className="settings-row-top">
+                <label className="settings-label">Preview</label>
+                <span className="settings-value-badge">
+                  {TOUCH_LAYOUTS.find((l) => l.id === touchConfig.layout)?.name ?? "Classic"}
+                </span>
+              </div>
+              <div className="settings-touch-preview">
+                <TouchGamepad
+                  clientRef={touchPreviewClient}
+                  visible
+                  settings={settings}
+                  onSettingChange={handleChange}
+                  inline
+                />
+              </div>
+              <span className="settings-subtle-hint">
+                Live preview of the selected layout, theme, size and opacity.
+              </span>
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <label className="settings-label">Layout</label>
+              <div className="settings-touch-grid">
+                {TOUCH_LAYOUTS.map((layout) => (
+                  <button
+                    key={layout.id}
+                    type="button"
+                    className={`settings-touch-layout ${touchConfig.layout === layout.id ? "active" : ""}`}
+                    onClick={() => handleChange("touchLayout", layout.id)}
+                  >
+                    <TouchLayoutThumb layoutId={layout.id} />
+                    <span className="settings-touch-layout-name">{layout.name}</span>
+                    <span className="settings-touch-layout-blurb">{layout.blurb}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <label className="settings-label">Theme</label>
+              <div className="settings-touch-themes">
+                {TOUCH_THEMES.map((theme) => (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    className={`settings-touch-theme ${touchConfig.theme === theme.id ? "active" : ""}`}
+                    onClick={() => handleChange("touchTheme", theme.id)}
+                    title={theme.name}
+                  >
+                    <span
+                      className="settings-touch-theme-swatch"
+                      style={{ background: theme.vars.accent, boxShadow: `0 0 14px ${theme.vars.glow}` }}
+                    />
+                    {theme.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <div className="settings-row-top">
+                <label className="settings-label">Overall size</label>
+                <span className="settings-value-badge">{Math.round(touchConfig.scale * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                className="settings-slider"
+                min={60}
+                max={160}
+                step={5}
+                value={Math.round(touchConfig.scale * 100)}
+                onChange={(e) => handleChange("touchScalePercent", parseInt(e.target.value, 10))}
+              />
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <div className="settings-row-top">
+                <label className="settings-label">Opacity</label>
+                <span className="settings-value-badge">{Math.round(touchConfig.opacity * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                className="settings-slider"
+                min={25}
+                max={100}
+                step={5}
+                value={Math.round(touchConfig.opacity * 100)}
+                onChange={(e) => handleChange("touchOpacityPercent", parseInt(e.target.value, 10))}
+              />
+              <span className="settings-subtle-hint">Lower values keep the game readable behind the controls.</span>
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <div className="settings-row-top">
+                <label className="settings-label">Button size</label>
+                <span className="settings-value-badge">{Math.round(touchConfig.buttonScale * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                className="settings-slider"
+                min={70}
+                max={150}
+                step={5}
+                value={Math.round(touchConfig.buttonScale * 100)}
+                onChange={(e) => handleChange("touchButtonSizePercent", parseInt(e.target.value, 10))}
+              />
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <div className="settings-row-top">
+                <label className="settings-label">Stick size</label>
+                <span className="settings-value-badge">{Math.round(touchConfig.stickScale * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                className="settings-slider"
+                min={70}
+                max={150}
+                step={5}
+                value={Math.round(touchConfig.stickScale * 100)}
+                onChange={(e) => handleChange("touchStickSizePercent", parseInt(e.target.value, 10))}
+              />
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <div className="settings-row-top">
+                <label className="settings-label">Stick deadzone</label>
+                <span className="settings-value-badge">{Math.round(touchConfig.deadzone * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                className="settings-slider"
+                min={0}
+                max={35}
+                step={1}
+                value={Math.round(touchConfig.deadzone * 100)}
+                onChange={(e) => handleChange("touchDeadzonePercent", parseInt(e.target.value, 10))}
+              />
+              <span className="settings-subtle-hint">Raise this if the crosshair drifts when you let go.</span>
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <div className="settings-row-top">
+                <label className="settings-label">Stick sensitivity</label>
+                <span className="settings-value-badge">{Math.round(touchConfig.sensitivity * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                className="settings-slider"
+                min={60}
+                max={170}
+                step={5}
+                value={Math.round(touchConfig.sensitivity * 100)}
+                onChange={(e) => handleChange("touchSensitivityPercent", parseInt(e.target.value, 10))}
+              />
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">
+                Face buttons
+                <span className="settings-hint">Glyph set shown on the right-hand cluster.</span>
+              </label>
+              <div className="settings-dropdown">
+                <select
+                  className="settings-select"
+                  value={touchConfig.faceStyle}
+                  onChange={(e) => handleChange("touchFaceStyle", e.target.value)}
+                >
+                  {FACE_STYLE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">
+                Triggers
+                <span className="settings-hint">Analog lets you slide your thumb for trigger pressure.</span>
+              </label>
+              <div className="settings-dropdown">
+                <select
+                  className="settings-select"
+                  value={touchConfig.triggerStyle}
+                  onChange={(e) => handleChange("touchTriggerStyle", e.target.value)}
+                >
+                  {TRIGGER_STYLE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="settings-row">
+              <label className="settings-label">
+                Haptics
+                <span className="settings-hint">Vibration feedback when a control is pressed.</span>
+              </label>
+              <div className="settings-dropdown">
+                <select
+                  className="settings-select"
+                  value={touchConfig.haptics}
+                  onChange={(e) => handleChange("touchHaptics", e.target.value)}
+                >
+                  {TOUCH_HAPTIC_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <label className="settings-label">Visible parts</label>
+              <div className="settings-toggle-grid">
+                {([
+                  ["touchShowDpad", "D-pad", settings.touchShowDpad ?? true],
+                  ["touchShowFace", "Face buttons", settings.touchShowFace ?? true],
+                  ["touchShowShoulders", "Bumpers + triggers", settings.touchShowShoulders ?? true],
+                  ["touchShowCentre", "Start / Back", settings.touchShowCentre ?? true],
+                  ["touchShowLeftStick", "Left stick", settings.touchShowLeftStick ?? true],
+                  ["touchShowRightStick", "Right stick", settings.touchShowRightStick ?? true],
+                  ["touchSwapSticks", "Swap stick roles", settings.touchSwapSticks ?? false],
+                  ["touchInvertLeftY", "Invert left Y", settings.touchInvertLeftY ?? false],
+                  ["touchInvertRightY", "Invert right Y", settings.touchInvertRightY ?? false],
+                  ["touchLeftHanded", "Left-handed mirror", settings.touchLeftHanded ?? false],
+                  ["touchShowTuneButton", "In-stream Tune button", settings.touchShowTuneButton ?? true],
+                ] as Array<[keyof Settings, string, boolean]>).map(([key, label, checked]) => (
+                  <label key={String(key)} className="settings-toggle-chip">
+                    <span>{label}</span>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => handleChange(key, e.target.checked)}
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="settings-row settings-row--column">
+              <div className="settings-touch-hint">
+                <Move size={14} />
+                <span>
+                  Drag any control to a new spot while streaming: tap the floating
+                  <strong> Tune </strong>
+                  button, choose <strong>Edit layout</strong>, then move the clusters. The layout
+                  switches to <strong>Custom</strong> automatically and is remembered.
+                </span>
               </div>
             </div>
           </div>

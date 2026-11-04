@@ -142,3 +142,114 @@ adb logcat -d | Select-String "Capacitor|Console|error" | Select-Object -Last 20
 | Signaling | `BrowserSignalingClient` -- native WebSocket in the WebView -- no Kotlin involved |
 | WebRTC | Browser built-in WebRTC stack inside the WebView |
 | Settings | Kotlin `GfnPlugin.kt` -- stored in `SharedPreferences` |
+
+
+---
+
+## Touch controls (on-screen controller)
+
+Every stream on Android can be played with a fully customisable virtual
+gamepad that is drawn over the video. Open **Settings → Touch controls** to
+tune it; the panel contains a live preview so you can see the result before
+you start a game.
+
+### Layout presets
+
+| Preset | What it is good for |
+|--------|---------------------|
+| Classic | D-pad + left stick left, face buttons + right stick right |
+| Compact | Everything tucked into the bottom corners (small phones) |
+| Split | Sticks in the bottom corners, face/D-pad higher up, bumpers on top |
+| Shooter | Single movement stick, big face cluster, triggers under the index fingers |
+| Twin sticks | Both sticks low, buttons above them -- twin-stick games |
+| Arcade | Large D-pad and buttons, no sticks -- fighters and retro titles |
+| Clean | Only sticks + face buttons, for HUD-heavy games |
+| Thumb pads | Face buttons and D-pad close to the thumbs |
+| Custom | Your own dragged-out arrangement |
+
+### Themes
+
+Ten colour themes ship out of the box: Obsidian, Aurora, Ember, Neon, Ice,
+Xbox, PlayStation, Matrix, Sakura and Gold. A theme recolours the whole
+overlay (buttons, sticks, D-pad, glow) and the face-button glyph colours.
+
+### Per-control options
+
+- Overall size and opacity of the overlay
+- Independent button and thumbstick scale
+- Stick deadzone and sensitivity (per-device drift fix)
+- Invert Y per stick, swap stick roles, left-handed mirror
+- Show/hide each cluster: D-pad, face buttons, bumpers + triggers,
+  Start/Back/Guide, left stick, right stick
+- Face button glyph set: Xbox, PlayStation, Nintendo or plain letters
+- Triggers: digital tap or analog drag (real 0-255 trigger values)
+- Haptics: off / light / medium / strong (uses `VIBRATE`)
+
+### Drag-to-reposition while playing
+
+While streaming, tap the floating **Tune** button on the right edge:
+
+1. **Edit layout** -- every cluster becomes draggable
+2. Move the controls where your thumbs want them
+3. **Done** -- the layout switches to **Custom** automatically and is saved
+
+**Reset** in the settings section (or the Tune panel) returns everything to
+the defaults. All values are stored in Android `SharedPreferences`
+(`opennow_settings`), so they survive app restarts.
+
+---
+
+## Automated builds (GitHub Actions)
+
+| Workflow | File | What it produces |
+|----------|------|------------------|
+| `auto-build` | `.github/workflows/auto-build.yml` | Desktop installers (Windows, macOS, Linux) |
+| `android-build` | `.github/workflows/android-build.yml` | Android APKs (debug + release) |
+
+The Android workflow runs on every push/PR that touches `opennow-stable/`
+and can also be started manually (**Actions → android-build → Run workflow**).
+It performs the exact steps from the manual build section:
+
+```
+npm ci   ->   npm run build   ->   npx cap sync android   ->   ./gradlew assembleDebug / assembleRelease
+```
+
+Artifacts are attached to the run as `opennow-android-apk`
+(`OpenNOW-<version>-debug.apk` and `OpenNOW-<version>-release.apk`).
+
+### Versioning
+
+`versionName` / `versionCode` are injected at build time
+(`-PopenNowVersionName=... -PopenNowVersionCode=...`):
+
+- branch builds use `0.0.0-nightly.<run number>`
+- tag builds use the tag name (e.g. `v0.4.0`), and the APKs are then
+  published on a GitHub release
+
+### Signing the release APK
+
+The release build looks for signing material in `android/keystore.properties`
+(never committed, listed in `.gitignore`):
+
+```properties
+RELEASE_STORE_FILE=/absolute/path/to/release.keystore
+RELEASE_STORE_PASSWORD=...
+RELEASE_KEY_ALIAS=...
+RELEASE_KEY_PASSWORD=...
+```
+
+In CI the same values are read from environment variables, so add these
+repository secrets to get a signed release APK:
+
+| Secret | Content |
+|--------|---------|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -w0 release.keystore` |
+| `ANDROID_KEYSTORE_PASSWORD` | store password |
+| `ANDROID_KEY_ALIAS` | key alias |
+| `ANDROID_KEY_PASSWORD` | key password |
+
+Without them the release APK is built unsigned instead of failing.
+
+> **Tip:** `npm ci` downloads the Electron binary by default. For
+> Android-only work set `ELECTRON_SKIP_BINARY_DOWNLOAD=1` (the workflow does
+> this for you) to save time and bandwidth.

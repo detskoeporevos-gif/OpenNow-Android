@@ -8,6 +8,7 @@ yarn-error.log*
 dist/
 dist-electron/
 dist-release/
+artifacts/
 out/
 
 # ── Android build cache ────────────────────────────────

@@ -2936,47 +2936,227 @@ body.controller-mode {
 
 
 /* ======================================================
-   TOUCH GAMEPAD (Android / touch screens)
+   TOUCH CONTROLLER (Android / touch devices)
+   Fully customisable overlay:
+   layout presets, colour themes, scale, opacity, haptics,
+   analog triggers, drag-to-reposition edit mode.
    ====================================================== */
 
 .tgp {
+  /* Sizes scale with the user's slider values (see touchControls.ts). */
+  --tgp-btn: calc(50px * var(--tgp-scale, 1) * var(--tgp-btn-scale, 1));
+  --tgp-stick: calc(92px * var(--tgp-scale, 1) * var(--tgp-stick-scale, 1));
+  --tgp-dpad: calc(112px * var(--tgp-scale, 1) * var(--tgp-btn-scale, 1));
+  --tgp-shoulder-w: calc(54px * var(--tgp-scale, 1) * var(--tgp-btn-scale, 1));
+  --tgp-shoulder-h: calc(36px * var(--tgp-scale, 1) * var(--tgp-btn-scale, 1));
+
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding: 12px 16px 20px;
+  inset: 0;
+  z-index: 200;
   pointer-events: none;
-  z-index: 500;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s ease;
 }
 
-.tgp-side {
+/* Static preview used inside the settings page. */
+.tgp--inline {
+  position: relative;
+  inset: auto;
+  height: 250px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--panel-border);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(88, 217, 138, 0.06), transparent 60%),
+    linear-gradient(180deg, #0d0d11 0%, #08080a 100%);
+  overflow: hidden;
+  opacity: 1;
+}
+
+/* ── Clusters ─────────────────────────────────────── */
+
+.tgp-cluster {
+  position: absolute;
+  transform: translate(-50%, -50%);
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: all;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+  /* The "opacity" setting dims the controls only -- the tune panel stays readable. */
+  opacity: var(--tgp-opacity, 0.85);
+  transition: opacity 0.15s ease;
 }
 
-.tgp-shoulders {
+.tgp-cluster-body {
   display: flex;
-  gap: 6px;
+  align-items: center;
+  justify-content: center;
 }
 
-.tgp-lower-left,
-.tgp-lower-right {
+.tgp-cluster--editing {
+  opacity: 1;
+  outline: 1px dashed var(--tgp-accent);
+  outline-offset: 8px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.22);
+  animation: tgp-edit-pulse 1.6s ease-in-out infinite;
+}
+
+.tgp-cluster-handle {
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--tgp-accent);
+  color: #07070a;
   display: flex;
-  gap: 10px;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
 }
 
-/* D-pad */
+@keyframes tgp-edit-pulse {
+  0%, 100% { background: rgba(0, 0, 0, 0.18); }
+  50% { background: rgba(255, 255, 255, 0.06); }
+}
+
+/* ── Face buttons (diamond layout) ────────────────── */
+
+.tgp-face {
+  display: grid;
+  grid-template-columns: repeat(3, var(--tgp-btn));
+  grid-template-rows: repeat(3, var(--tgp-btn));
+  gap: 2px;
+  place-items: center;
+}
+
+.tgp-face-row {
+  display: contents;
+}
+
+.tgp-face-pos-top { grid-area: 1 / 2; }
+.tgp-face-pos-left { grid-area: 2 / 1; }
+.tgp-face-pos-right { grid-area: 2 / 3; }
+.tgp-face-pos-bottom { grid-area: 3 / 2; }
+
+.tgp-face-btn {
+  width: calc(var(--tgp-btn) * 0.94);
+  height: calc(var(--tgp-btn) * 0.94);
+  border-radius: 50%;
+  border: 2px solid var(--face-color, var(--tgp-border));
+  background: var(--tgp-surface);
+  color: var(--face-color, var(--tgp-text));
+  font-weight: 700;
+  font-size: calc(var(--tgp-btn) * 0.32);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  touch-action: none;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  transition: transform 0.06s ease, background 0.06s ease, box-shadow 0.06s ease;
+}
+
+.tgp-face-btn.is-pressed {
+  transform: scale(0.92);
+  background: var(--face-color, var(--tgp-accent));
+  color: #07070a;
+  border-color: var(--face-color, var(--tgp-accent));
+  box-shadow: 0 0 16px var(--tgp-glow);
+}
+
+/* ── Bumpers ──────────────────────────────────────── */
+
+.tgp-cluster--shoulders {
+  display: flex;
+  align-items: center;
+}
+
+.tgp-cluster--shoulders .tgp-cluster-body {
+  display: flex;
+  flex-direction: row;
+  gap: calc(6px * var(--tgp-scale, 1));
+}
+
+.tgp-bumper {
+  width: var(--tgp-shoulder-w);
+  height: var(--tgp-shoulder-h);
+  border-radius: calc(var(--tgp-shoulder-h) * 0.42);
+  border: 1px solid var(--tgp-border);
+  background: var(--tgp-surface);
+  color: var(--tgp-text);
+  font-size: calc(var(--tgp-shoulder-h) * 0.34);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0;
+  touch-action: none;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.06s ease, border-color 0.06s ease, transform 0.06s ease;
+}
+
+.tgp-bumper.is-pressed {
+  background: var(--tgp-surface-strong);
+  border-color: var(--tgp-border-strong);
+  color: var(--tgp-accent);
+  transform: scale(0.95);
+  box-shadow: 0 0 14px var(--tgp-glow);
+}
+
+/* ── Triggers ─────────────────────────────────────── */
+
+.tgp-trigger {
+  position: relative;
+  width: var(--tgp-shoulder-w);
+  height: calc(var(--tgp-shoulder-h) * 1.35);
+  border-radius: calc(var(--tgp-shoulder-h) * 0.5);
+  border: 1px solid var(--tgp-border);
+  background: var(--tgp-surface);
+  color: var(--tgp-text);
+  font-size: calc(var(--tgp-shoulder-h) * 0.34);
+  font-weight: 700;
+  padding: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.tgp-trigger-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--tgp-accent), transparent);
+  pointer-events: none;
+  transition: opacity 0.05s linear;
+}
+
+.tgp-trigger-label {
+  position: relative;
+  z-index: 1;
+}
+
+.tgp-trigger.is-pressed {
+  border-color: var(--tgp-border-strong);
+  box-shadow: 0 0 14px var(--tgp-glow);
+}
+
+/* ── D-pad ────────────────────────────────────────── */
+
 .tgp-dpad {
-  width: 90px;
-  height: 90px;
+  width: var(--tgp-dpad);
+  height: var(--tgp-dpad);
   touch-action: none;
   cursor: pointer;
 }
@@ -2985,338 +3165,500 @@ body.controller-mode {
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-rows: 1fr 1fr 1fr;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
   gap: 2px;
 }
 
-.tgp-dpad-up,
-.tgp-dpad-down {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  width: 30px;
-  height: 30px;
-  margin: 0 auto;
+.tgp-dpad-arm {
+  background: var(--tgp-surface);
+  border: 1px solid var(--tgp-border);
+  border-radius: 6px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.06s ease, box-shadow 0.06s ease;
 }
 
-.tgp-dpad-row {
+.tgp-dpad-up { grid-area: 1 / 2; border-radius: 8px 8px 3px 3px; }
+.tgp-dpad-down { grid-area: 3 / 2; border-radius: 3px 3px 8px 8px; }
+.tgp-dpad-left { grid-area: 2 / 1; border-radius: 8px 3px 3px 8px; }
+.tgp-dpad-right { grid-area: 2 / 3; border-radius: 3px 8px 8px 3px; }
+
+.tgp-dpad-hub {
+  grid-area: 2 / 2;
+  margin: 18%;
+  border-radius: 50%;
+  background: var(--tgp-surface-strong);
+  border: 1px solid var(--tgp-border);
+}
+
+.tgp-dpad-arm.is-active {
+  background: var(--tgp-accent-soft);
+  border-color: var(--tgp-border-strong);
+  box-shadow: 0 0 14px var(--tgp-glow);
+}
+
+/* ── Thumbsticks ──────────────────────────────────── */
+
+.tgp-stick {
+  width: var(--tgp-stick);
+  height: var(--tgp-stick);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.05), transparent 62%),
+    var(--tgp-surface);
+  border: 2px solid var(--tgp-border);
   display: flex;
-  gap: 2px;
   align-items: center;
   justify-content: center;
-}
-
-.tgp-dpad-left,
-.tgp-dpad-right {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
-  width: 30px;
-  height: 30px;
-}
-
-.tgp-dpad-center {
-  width: 30px;
-  height: 30px;
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 4px;
-}
-
-/* Analog stick */
-.tgp-stick {
-  width: 80px;
-  height: 80px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
   position: relative;
   touch-action: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.45), 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.tgp-stick.is-active {
+  border-color: var(--tgp-border-strong);
+  box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.45), 0 0 18px var(--tgp-glow);
+}
+
+.tgp-stick-label {
+  position: absolute;
+  bottom: 6%;
+  font-size: calc(var(--tgp-stick) * 0.11);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--tgp-border);
+  pointer-events: none;
 }
 
 .tgp-stick-knob {
-  width: 34px;
-  height: 34px;
-  background: rgba(255, 255, 255, 0.35);
+  width: 46%;
+  height: 46%;
   border-radius: 50%;
-  transition: transform 0.05s ease;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55), var(--tgp-knob) 62%);
+  border: 2px solid var(--tgp-border-strong);
   will-change: transform;
+  transition: transform 0.02s linear;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
 }
 
-/* Face buttons */
-.tgp-face {
+/* ── Centre cluster (Back / Guide / Start) ────────── */
+
+.tgp-centre-cluster {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  gap: calc(8px * var(--tgp-scale, 1));
   align-items: center;
-  gap: 4px;
 }
 
-.tgp-face-row {
-  display: flex;
-  gap: 4px;
-}
-
-.tgp-face-btn {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  border: 2px solid currentColor;
-  background: rgba(0, 0, 0, 0.5);
-  font-weight: 700;
-  font-size: 0.8rem;
-  cursor: pointer;
-  touch-action: none;
-  transition: background 0.08s ease, color 0.08s ease;
+.tgp-pill {
+  min-width: calc(46px * var(--tgp-scale, 1) * var(--tgp-btn-scale, 1));
+  height: calc(28px * var(--tgp-scale, 1) * var(--tgp-btn-scale, 1));
+  padding: 0 calc(10px * var(--tgp-scale, 1));
+  border-radius: var(--r-full);
+  border: 1px solid var(--tgp-border);
+  background: var(--tgp-surface);
+  color: var(--tgp-text);
+  font-size: calc(13px * var(--tgp-scale, 1));
   display: flex;
   align-items: center;
   justify-content: center;
+  touch-action: none;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.06s ease, border-color 0.06s ease;
 }
 
-.tgp-face-btn--pressed {
-  filter: brightness(0.85);
+.tgp-pill.is-pressed {
+  background: var(--tgp-surface-strong);
+  border-color: var(--tgp-border-strong);
+  color: var(--tgp-accent);
+  box-shadow: 0 0 12px var(--tgp-glow);
 }
 
-/* Shoulder buttons */
-.tgp-shoulder {
-  padding: 8px 14px;
+.tgp-glyph {
+  line-height: 1;
+}
+
+/* ── Floating tune button + panel ─────────────────── */
+
+.tgp-tune-btn {
+  /* Left edge: the right side is where the shoulder/face clusters live. */
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--tgp-border);
+  background: var(--tgp-surface-strong);
+  color: var(--tgp-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: manipulation;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  opacity: 0.75;
+}
+
+.tgp-tune-btn:active {
+  opacity: 1;
+}
+
+.tgp-tune {
+  position: absolute;
+  right: 10px;
+  bottom: 12px;
+  width: min(340px, calc(100vw - 20px));
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--tgp-border);
+  background: rgba(12, 12, 15, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  color: var(--tgp-text);
+  touch-action: manipulation;
+}
+
+.tgp-tune-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.tgp-tune-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--tgp-accent);
+}
+
+.tgp-tune-close {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.tgp-tune-section {
+  margin-bottom: 10px;
+}
+
+.tgp-tune-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tgp-tune-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.tgp-tune-value {
+  font-size: 0.72rem;
+  color: var(--tgp-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.tgp-tune-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.tgp-chip {
+  padding: 5px 10px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.tgp-chip.is-active {
+  border-color: var(--tgp-accent);
+  background: var(--tgp-accent-soft);
+  color: var(--tgp-accent);
+}
+
+.tgp-tune-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 6px;
+}
+
+.tgp-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.tgp-swatch.is-active {
+  border-color: #fff;
+  transform: scale(1.12);
+}
+
+.tgp-range {
+  width: 100%;
+  margin-top: 4px;
+  accent-color: var(--tgp-accent);
+}
+
+.tgp-tune-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tgp-tune-action {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
   border-radius: var(--r-sm);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.05);
   color: var(--ink);
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
-  touch-action: none;
-  transition: background 0.08s ease;
 }
 
-.tgp-shoulder--pressed {
-  background: rgba(255, 255, 255, 0.2);
+.tgp-tune-action.is-active {
+  border-color: var(--tgp-accent);
+  background: var(--tgp-accent-soft);
+  color: var(--tgp-accent);
 }
 
-/* Centre buttons (Start / Back) */
-.tgp-centre-cluster {
+.tgp-tune-hint {
+  margin: 9px 0 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+/* ── Edit-mode bar ────────────────────────────────── */
+
+.tgp-edit-bar {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
   display: flex;
-  gap: 8px;
   align-items: center;
-  pointer-events: all;
-  padding-bottom: 30px;
-}
-
-.tgp-centre {
-  padding: 7px 13px;
+  gap: 10px;
+  padding: 7px 8px 7px 14px;
   border-radius: var(--r-full);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.5);
-  color: var(--ink-soft);
-  font-size: 0.8rem;
+  background: rgba(10, 10, 13, 0.92);
+  border: 1px solid var(--tgp-accent);
+  box-shadow: var(--shadow-md), 0 0 18px var(--tgp-glow);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+
+.tgp-edit-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--tgp-text);
+}
+
+.tgp-edit-done {
+  padding: 6px 14px;
+  border-radius: var(--r-full);
+  border: none;
+  background: var(--tgp-accent);
+  color: #07070a;
+  font-size: 0.74rem;
+  font-weight: 700;
   cursor: pointer;
-  touch-action: none;
-  transition: background 0.08s ease;
 }
 
-.tgp-centre--pressed {
-  background: rgba(255, 255, 255, 0.18);
-  color: var(--ink);
+/* ── Settings page: touch controls section ────────── */
+
+.settings-touch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+  width: 100%;
 }
 
-/* ======================================================
-   TOUCH GAMEPAD (Android / touch devices)
-   ====================================================== */
-
-/* Root overlay -- sits above the stream video, covers full viewport */
-.tgp {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 200;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  padding: 12px 8px 20px;
-  gap: 0;
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* Left and right halves */
-.tgp-side {
+.settings-touch-layout {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
-  pointer-events: auto;
-}
-.tgp-side--right {
-  align-items: flex-end;
-}
-
-/* Shoulder buttons row */
-.tgp-shoulders {
-  display: flex;
-  flex-direction: row;
   gap: 6px;
-}
-
-/* Lower left: D-pad + left stick */
-.tgp-lower-left,
-.tgp-lower-right {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-/* Centre cluster (Back + Start) */
-.tgp-centre-cluster {
-  display: flex;
-  flex-direction: row;
-  gap: 10px;
-  align-self: flex-end;
-  padding-bottom: 40px;
-  pointer-events: auto;
-}
-
-/* Shoulder button */
-.tgp-shoulder {
-  width: 52px;
-  height: 36px;
-  border-radius: 8px;
-  border: 2px solid rgba(255,255,255,0.35);
-  background: rgba(0,0,0,0.55);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  padding: 9px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--panel-border);
+  background: var(--card);
   cursor: pointer;
-  touch-action: none;
-  transition: background 0.08s, border-color 0.08s;
-}
-.tgp-shoulder--pressed {
-  background: rgba(255,255,255,0.25);
-  border-color: rgba(255,255,255,0.8);
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.14s ease;
+  text-align: left;
 }
 
-/* Centre (Start/Back) button */
-.tgp-centre {
-  width: 44px;
-  height: 28px;
-  border-radius: 6px;
-  border: 2px solid rgba(255,255,255,0.3);
-  background: rgba(0,0,0,0.5);
-  color: #fff;
-  font-size: 14px;
-  cursor: pointer;
-  touch-action: none;
-  transition: background 0.08s;
-}
-.tgp-centre--pressed {
-  background: rgba(255,255,255,0.22);
+.settings-touch-layout:hover {
+  border-color: var(--panel-border-solid);
+  background: var(--card-hover);
+  transform: translateY(-1px);
 }
 
-/* D-pad */
-.tgp-dpad {
-  width: 110px;
-  height: 110px;
-  touch-action: none;
-  cursor: pointer;
-}
-.tgp-dpad-cross {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  grid-template-rows: 1fr auto 1fr;
-  align-items: center;
-}
-.tgp-dpad-up,
-.tgp-dpad-down {
-  background: rgba(255,255,255,0.18);
-  border: 2px solid rgba(255,255,255,0.28);
-  border-radius: 6px 6px 0 0;
-  width: 36px;
-  height: 36px;
-  margin: 0 auto;
-}
-.tgp-dpad-down {
-  border-radius: 0 0 6px 6px;
-}
-.tgp-dpad-row {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  width: 100%;
-}
-.tgp-dpad-left,
-.tgp-dpad-right {
-  background: rgba(255,255,255,0.18);
-  border: 2px solid rgba(255,255,255,0.28);
-  border-radius: 6px 0 0 6px;
-  width: 36px;
-  height: 36px;
-}
-.tgp-dpad-right {
-  border-radius: 0 6px 6px 0;
-}
-.tgp-dpad-center {
-  background: rgba(255,255,255,0.12);
-  width: 36px;
-  height: 36px;
+.settings-touch-layout.active {
+  border-color: var(--accent);
+  background: var(--accent-surface);
 }
 
-/* Analog thumbstick */
-.tgp-stick {
-  width: 90px;
-  height: 90px;
-  border-radius: 50%;
-  background: rgba(0,0,0,0.45);
-  border: 2px solid rgba(255,255,255,0.22);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  touch-action: none;
+.settings-touch-layout-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.settings-touch-layout-blurb {
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.settings-touch-thumb {
   position: relative;
-  cursor: pointer;
-}
-.tgp-stick-knob {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.35);
-  border: 2px solid rgba(255,255,255,0.6);
-  will-change: transform;
-  transition: transform 0.02s linear;
+  width: 100%;
+  height: 52px;
+  border-radius: var(--r-sm);
+  background: linear-gradient(180deg, #101014 0%, #08080a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow: hidden;
 }
 
-/* Face buttons grid */
-.tgp-face {
+.settings-touch-thumb-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.settings-touch-themes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-touch-theme {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-}
-.tgp-face-row {
-  display: flex;
-  flex-direction: row;
-  gap: 4px;
-}
-.tgp-face-btn {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  border: 2px solid;
-  font-size: 15px;
-  font-weight: 700;
+  gap: 5px;
+  padding: 0;
+  border: none;
+  background: none;
   cursor: pointer;
-  touch-action: none;
-  transition: background 0.06s, color 0.06s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.tgp-face-btn--pressed {
-  filter: brightness(1.3);
+  color: var(--ink-muted);
+  font-size: 0.64rem;
 }
 
+.settings-touch-theme-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+
+.settings-touch-theme.active {
+  color: var(--ink);
+}
+
+.settings-touch-theme.active .settings-touch-theme-swatch {
+  border-color: #fff;
+  transform: scale(1.08);
+}
+
+.settings-touch-preview {
+  width: 100%;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--panel-border);
+}
+
+.settings-touch-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  background: rgba(96, 165, 250, 0.07);
+  border: 1px solid rgba(96, 165, 250, 0.18);
+  color: var(--ink-soft);
+  font-size: 0.7rem;
+  line-height: 1.5;
+}
+
+.settings-toggle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.settings-toggle-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--panel-border);
+  background: var(--card);
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.settings-toggle-chip input {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
 /* ======================================================
    REDUCED MOTION
    ====================================================== */

@@ -5,7 +5,11 @@ import { getPlatformApi } from "./platform/index";
 import { isAndroid } from "./platform/detect";  // isAndroid is now a function -- call it as isAndroid()
 import { TouchGamepad } from "./components/TouchGamepad";
 import { TouchInputHandler } from "./gfn/touchInput";
-import { createStreamDiagnosticsStore, type StreamDiagnosticsStore } from "./utils/streamDiagnosticsStore";
+import {
+  createStreamDiagnosticsStore,
+  useStreamDiagnosticsStore,
+  type StreamDiagnosticsStore,
+} from "./utils/streamDiagnosticsStore";
 import { useElapsedSeconds } from "./utils/useElapsedSeconds";
 import { usePlaytime } from "./utils/usePlaytime";
 
@@ -798,7 +802,7 @@ export function App(): JSX.Element {
             });
             setLaunchError(null);
             setStreamStatus("streaming");
-            setSessionStartedAtMs((current) => current ?? Date.now());
+            setStreamStartedAtMs((current) => current ?? Date.now());
 
             // On Android, set up touch-to-mouse translation on the video element.
             if (isAndroid() && videoRef.current && clientRef.current) {
@@ -825,7 +829,7 @@ export function App(): JSX.Element {
           setSession(null);
           setStreamingGame(null);
           setLaunchError(null);
-          setSessionStartedAtMs(null);
+          setStreamStartedAtMs(null);
           setNegotiatedStreamProfile(null);
           setStreamWarning(null);
           setEscHoldReleaseIndicator({ visible: false, progress: 0 });
@@ -1181,11 +1185,10 @@ export function App(): JSX.Element {
       setStreamStatus("idle");
       setQueuePosition(undefined);
       setQueueEta(undefined);
-      setSessionStartedAtMs(null);
-      setSessionElapsedSeconds(0);
+      setStreamStartedAtMs(null);
       setStreamWarning(null);
       setEscHoldReleaseIndicator({ visible: false, progress: 0 });
-      setDiagnostics(defaultDiagnostics());
+      diagnosticsStoreRef.current.reset();
       void refreshNavbarActiveSession();
     } finally {
       launchInFlightRef.current = false;
@@ -1219,8 +1222,7 @@ export function App(): JSX.Element {
 
     setLaunchError(null);
     setQueuePosition(undefined);
-    setSessionStartedAtMs(Date.now());
-    setSessionElapsedSeconds(0);
+    setStreamStartedAtMs(Date.now());
     setStreamWarning(null);
     updateLoadingStep("setup");
 
@@ -1236,11 +1238,10 @@ export function App(): JSX.Element {
       setSession(null);
       setStreamStatus("idle");
       setQueuePosition(undefined);
-      setSessionStartedAtMs(null);
-      setSessionElapsedSeconds(0);
+      setStreamStartedAtMs(null);
       setStreamWarning(null);
       setEscHoldReleaseIndicator({ visible: false, progress: 0 });
-      setDiagnostics(defaultDiagnostics());
+      diagnosticsStoreRef.current.reset();
       void refreshNavbarActiveSession();
     } finally {
       launchInFlightRef.current = false;
@@ -1282,11 +1283,10 @@ export function App(): JSX.Element {
       setStreamingGame(null);
       setNavbarActiveSession(null);
       setLaunchError(null);
-      setSessionStartedAtMs(null);
-      setSessionElapsedSeconds(0);
+      setStreamStartedAtMs(null);
       setStreamWarning(null);
       setEscHoldReleaseIndicator({ visible: false, progress: 0 });
-      setDiagnostics(defaultDiagnostics());
+      diagnosticsStoreRef.current.reset();
       void refreshNavbarActiveSession();
     } catch (error) {
       console.error("Stop failed:", error);
@@ -1301,11 +1301,10 @@ export function App(): JSX.Element {
     setLaunchError(null);
     setStreamingGame(null);
     setQueuePosition(undefined);
-    setSessionStartedAtMs(null);
-    setSessionElapsedSeconds(0);
+    setStreamStartedAtMs(null);
     setStreamWarning(null);
     setEscHoldReleaseIndicator({ visible: false, progress: 0 });
-    setDiagnostics(defaultDiagnostics());
+    diagnosticsStoreRef.current.reset();
     void refreshNavbarActiveSession();
   }, [refreshNavbarActiveSession]);
 
@@ -1578,10 +1577,13 @@ export function App(): JSX.Element {
           />
         )}
 
-        {/* On-screen gamepad -- only shown on Android while the stream is running */}
+        {/* On-screen gamepad -- only shown on Android while the stream is running.
+            Layout, theme, size, opacity, haptics and positions come from settings. */}
         <TouchGamepad
           clientRef={clientRef}
-          visible={isAndroid() && streamStatus === "streaming"}
+          visible={isAndroid() && streamStatus === "streaming" && (settings.touchControlsEnabled ?? true)}
+          settings={settings}
+          onSettingChange={updateSetting}
         />
 
         {streamStatus !== "streaming" && (

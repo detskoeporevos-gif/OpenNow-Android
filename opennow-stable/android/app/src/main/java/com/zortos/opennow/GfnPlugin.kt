@@ -1153,6 +1153,31 @@ class GfnPlugin : Plugin() {
         result.put("controllerBackgroundAnimations", prefs.getBoolean("controllerBackgroundAnimations", false))
         result.put("autoFullScreen", prefs.getBoolean("autoFullScreen", false))
         result.put("favoriteGameIds", com.getcapacitor.JSArray())
+        // Touch controller customisation
+        result.put("touchControlsEnabled", prefs.getBoolean("touchControlsEnabled", true))
+        result.put("touchLayout", prefs.getString("touchLayout", "classic"))
+        result.put("touchTheme", prefs.getString("touchTheme", "obsidian"))
+        result.put("touchFaceStyle", prefs.getString("touchFaceStyle", "xbox"))
+        result.put("touchTriggerStyle", prefs.getString("touchTriggerStyle", "analog"))
+        result.put("touchHaptics", prefs.getString("touchHaptics", "light"))
+        result.put("touchScalePercent", prefs.getInt("touchScalePercent", 100))
+        result.put("touchOpacityPercent", prefs.getInt("touchOpacityPercent", 85))
+        result.put("touchButtonSizePercent", prefs.getInt("touchButtonSizePercent", 100))
+        result.put("touchStickSizePercent", prefs.getInt("touchStickSizePercent", 100))
+        result.put("touchDeadzonePercent", prefs.getInt("touchDeadzonePercent", 12))
+        result.put("touchSensitivityPercent", prefs.getInt("touchSensitivityPercent", 100))
+        result.put("touchInvertLeftY", prefs.getBoolean("touchInvertLeftY", false))
+        result.put("touchInvertRightY", prefs.getBoolean("touchInvertRightY", false))
+        result.put("touchSwapSticks", prefs.getBoolean("touchSwapSticks", false))
+        result.put("touchLeftHanded", prefs.getBoolean("touchLeftHanded", false))
+        result.put("touchShowDpad", prefs.getBoolean("touchShowDpad", true))
+        result.put("touchShowFace", prefs.getBoolean("touchShowFace", true))
+        result.put("touchShowShoulders", prefs.getBoolean("touchShowShoulders", true))
+        result.put("touchShowCentre", prefs.getBoolean("touchShowCentre", true))
+        result.put("touchShowLeftStick", prefs.getBoolean("touchShowLeftStick", true))
+        result.put("touchShowRightStick", prefs.getBoolean("touchShowRightStick", true))
+        result.put("touchShowTuneButton", prefs.getBoolean("touchShowTuneButton", true))
+        result.put("touchCustomPositions", prefs.getString("touchCustomPositions", ""))
         call.resolve(result)
     }
 
@@ -1162,10 +1187,15 @@ class GfnPlugin : Plugin() {
         val prefs = activity.getSharedPreferences("opennow_settings", android.content.Context.MODE_PRIVATE).edit()
 
         when (key) {
-            "fps", "maxBitrateMbps", "sessionClockShowEveryMinutes", "sessionClockShowDurationSeconds", "mouseAcceleration" ->
+            "fps", "maxBitrateMbps", "sessionClockShowEveryMinutes", "sessionClockShowDurationSeconds", "mouseAcceleration",
+            "touchScalePercent", "touchOpacityPercent", "touchButtonSizePercent", "touchStickSizePercent",
+            "touchDeadzonePercent", "touchSensitivityPercent" ->
                 prefs.putInt(key, call.getInt("value") ?: 0)
             "clipboardPaste", "hideStreamButtons", "enableL4S", "showStatsOnLaunch", "sessionCounterEnabled",
-            "controllerMode", "controllerUiSounds", "autoLoadControllerLibrary", "controllerBackgroundAnimations", "autoFullScreen" ->
+            "controllerMode", "controllerUiSounds", "autoLoadControllerLibrary", "controllerBackgroundAnimations", "autoFullScreen",
+            "touchControlsEnabled", "touchInvertLeftY", "touchInvertRightY", "touchSwapSticks", "touchLeftHanded",
+            "touchShowDpad", "touchShowFace", "touchShowShoulders", "touchShowCentre", "touchShowLeftStick",
+            "touchShowRightStick", "touchShowTuneButton" ->
                 prefs.putBoolean(key, call.getBoolean("value") ?: false)
             "mouseSensitivity" ->
                 prefs.putFloat(key, (call.getFloat("value") ?: 1f))

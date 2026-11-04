@@ -2978,6 +2978,34 @@ export class GfnWebRtcClient {
   }
 
   /**
+   * Set an analog trigger value for on-screen trigger controls.
+   * value is normalised in [0, 1] (0 = released, 1 = fully pulled).
+   */
+  public sendGamepadTrigger(side: "left" | "right", value: number): void {
+    if (!this.inputReady) return;
+    const prev = this.previousGamepadStates.get(0);
+    const u8 = Math.max(0, Math.min(255, Math.round(value * 255)));
+
+    const state = {
+      controllerId: 0,
+      buttons:      prev?.buttons      ?? 0,
+      leftTrigger:  side === "left"  ? u8 : (prev?.leftTrigger  ?? 0),
+      rightTrigger: side === "right" ? u8 : (prev?.rightTrigger ?? 0),
+      leftStickX:   prev?.leftStickX   ?? 0,
+      leftStickY:   prev?.leftStickY   ?? 0,
+      rightStickX:  prev?.rightStickX  ?? 0,
+      rightStickY:  prev?.rightStickY  ?? 0,
+      connected: true,
+      timestampUs: BigInt(Math.floor(performance.now() * 1000)),
+    };
+
+    this.previousGamepadStates.set(0, state);
+    const usePR = this.mouseInputChannel?.readyState === "open";
+    const bytes = this.inputEncoder.encodeGamepadState(state, this.gamepadBitmap | 1, usePR);
+    this.sendGamepad(bytes);
+  }
+
+  /**
    * Enumerate available microphone devices
    */
   async enumerateMicrophones(): Promise<MediaDeviceInfo[]> {

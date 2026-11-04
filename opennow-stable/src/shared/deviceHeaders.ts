@@ -52,12 +52,12 @@ export function getDeviceProfile(forAndroid: boolean): GfnDeviceProfile {
     };
   }
 
-  // Detect the desktop OS from process.platform (only available in Node / Electron)
+  // Detect the desktop OS from process.platform (only available in Node / Electron).
+  // Read it off globalThis so this shared module also type-checks for the WebView build.
+  const nodePlatform = (globalThis as { process?: { platform?: string } }).process?.platform;
   let os: DeviceOs = "WINDOWS";
-  if (typeof process !== "undefined") {
-    if (process.platform === "darwin") os = "MACOS";
-    else if (process.platform === "linux") os = "LINUX";
-  }
+  if (nodePlatform === "darwin") os = "MACOS";
+  else if (nodePlatform === "linux") os = "LINUX";
 
   return {
     os,

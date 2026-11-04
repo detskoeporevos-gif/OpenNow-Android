@@ -8,6 +8,12 @@
     "paths": {
       "@shared/*": [
         "src/shared/*"
+      ],
+      "@main/*": [
+        "src/main/*"
+      ],
+      "node:crypto": [
+        "src/renderer/src/platform/cryptoShim.ts"
       ]
     },
     "strict": true,

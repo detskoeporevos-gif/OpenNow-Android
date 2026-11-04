@@ -1,9 +1,20 @@
 import { app } from "electron";
 import { join } from "node:path";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import type { VideoCodec, ColorQuality, VideoAccelerationPreference, MicrophoneMode } from "@shared/gfn";
+import type {
+  VideoCodec,
+  ColorQuality,
+  VideoAccelerationPreference,
+  MicrophoneMode,
+  Settings as SharedSettings,
+} from "@shared/gfn";
 
-export interface Settings {
+/**
+ * Electron-side settings shape. It extends the renderer-facing Settings type so
+ * new cross-platform keys (touch controls, v0.3.4 additions, ...) are always in
+ * sync and `setSetting` accepts every key the UI can send.
+ */
+export interface Settings extends SharedSettings {
   /** Video resolution (e.g., "1920x1080") */
   resolution: string;
   /** Target FPS (30, 60, 120, etc.) */
@@ -79,6 +90,47 @@ const DEFAULT_SETTINGS: Settings = {
   sessionClockShowDurationSeconds: 30,
   windowWidth: 1400,
   windowHeight: 900,
+  // v0.3.4 upstream additions
+  keyboardLayout: "en-US",
+  gameLanguage: "en_US",
+  enableL4S: false,
+  showStatsOnLaunch: false,
+  sessionCounterEnabled: true,
+  mouseAcceleration: 1,
+  aspectRatio: "16:9",
+  shortcutScreenshot: "",
+  shortcutToggleRecording: "",
+  controllerMode: false,
+  controllerUiSounds: false,
+  autoLoadControllerLibrary: false,
+  controllerBackgroundAnimations: false,
+  autoFullScreen: false,
+  favoriteGameIds: [],
+  // Touch controls (shared with the Android build)
+  touchControlsEnabled: true,
+  touchLayout: "classic",
+  touchTheme: "obsidian",
+  touchFaceStyle: "xbox",
+  touchTriggerStyle: "analog",
+  touchHaptics: "light",
+  touchScalePercent: 100,
+  touchOpacityPercent: 85,
+  touchButtonSizePercent: 100,
+  touchStickSizePercent: 100,
+  touchDeadzonePercent: 12,
+  touchSensitivityPercent: 100,
+  touchInvertLeftY: false,
+  touchInvertRightY: false,
+  touchSwapSticks: false,
+  touchLeftHanded: false,
+  touchShowDpad: true,
+  touchShowFace: true,
+  touchShowShoulders: true,
+  touchShowCentre: true,
+  touchShowLeftStick: true,
+  touchShowRightStick: true,
+  touchShowTuneButton: true,
+  touchCustomPositions: "",
 };
 
 export class SettingsManager {

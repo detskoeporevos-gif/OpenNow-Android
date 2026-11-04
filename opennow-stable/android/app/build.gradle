@@ -1,6 +1,25 @@
-def keystorePropertiesFile = file("D:\\Projects\\gfnclient\\keystore.properties")
+// ── Release signing ───────────────────────────────────────────────────────
+// keystore.properties lives in android/ and is never committed. When it is
+// absent (CI, fresh clones) the release build simply stays unsigned instead of
+// failing at configuration time.
+// Values can also come from environment variables, which is what the GitHub
+// Actions workflow uses (RELEASE_STORE_FILE, RELEASE_STORE_PASSWORD,
+// RELEASE_KEY_ALIAS, RELEASE_KEY_PASSWORD).
+def keystorePropertiesFile = rootProject.file("keystore.properties")
 def keystoreProperties = new Properties()
-keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+["RELEASE_STORE_FILE", "RELEASE_STORE_PASSWORD", "RELEASE_KEY_ALIAS", "RELEASE_KEY_PASSWORD"].each { key ->
+    def envValue = System.getenv(key)
+    if (envValue != null && !envValue.isEmpty() && !keystoreProperties.containsKey(key)) {
+        keystoreProperties.setProperty(key, envValue)
+    }
+}
+def signingStoreFile = keystoreProperties.getProperty("RELEASE_STORE_FILE")
+def hasReleaseSigning = signingStoreFile != null &&
+        !signingStoreFile.isEmpty() &&
+        file(signingStoreFile).exists()
 
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
@@ -12,26 +31,31 @@ android {
         applicationId "com.zortos.opennow"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Override from the command line in CI: -PopenNowVersionCode=42 -PopenNowVersionName=0.4.0
+        versionCode project.hasProperty("openNowVersionCode") ? project.property("openNowVersionCode").toInteger() : 1
+        versionName project.hasProperty("openNowVersionName") ? project.property("openNowVersionName").toString() : "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
     signingConfigs {
-        release {
-            storeFile file(keystoreProperties['RELEASE_STORE_FILE'])
-            storePassword keystoreProperties['RELEASE_STORE_PASSWORD']
-            keyAlias keystoreProperties['RELEASE_KEY_ALIAS']
-            keyPassword keystoreProperties['RELEASE_KEY_PASSWORD']
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(signingStoreFile)
+                storePassword keystoreProperties['RELEASE_STORE_PASSWORD']
+                keyAlias keystoreProperties['RELEASE_KEY_ALIAS']
+                keyPassword keystoreProperties['RELEASE_KEY_PASSWORD']
+            }
         }
     }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

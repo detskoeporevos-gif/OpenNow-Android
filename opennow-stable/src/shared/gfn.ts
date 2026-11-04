@@ -65,6 +65,45 @@ export interface Settings {
   controllerBackgroundAnimations?: boolean;
   autoFullScreen?: boolean;
   favoriteGameIds?: string[];
+  // Touch controls (Android on-screen gamepad) customisation
+  /** Show the on-screen touch controller while streaming */
+  touchControlsEnabled?: boolean;
+  /** Layout preset id (classic, compact, split, fps, twin, arcade, clean, thumb, custom) */
+  touchLayout?: string;
+  /** Colour theme id (obsidian, aurora, ember, ...) */
+  touchTheme?: string;
+  /** Face button glyph set: xbox, playstation, nintendo, letters */
+  touchFaceStyle?: string;
+  /** Trigger behaviour: buttons (tap) or analog (drag) */
+  touchTriggerStyle?: string;
+  /** Haptic strength: off, light, medium, strong */
+  touchHaptics?: string;
+  /** Overlay scale in percent (60-160) */
+  touchScalePercent?: number;
+  /** Overlay opacity in percent (25-100) */
+  touchOpacityPercent?: number;
+  /** Button size multiplier in percent (70-150) */
+  touchButtonSizePercent?: number;
+  /** Thumbstick size multiplier in percent (70-150) */
+  touchStickSizePercent?: number;
+  /** Radial stick deadzone in percent (0-35) */
+  touchDeadzonePercent?: number;
+  /** Stick sensitivity in percent (60-170) */
+  touchSensitivityPercent?: number;
+  touchInvertLeftY?: boolean;
+  touchInvertRightY?: boolean;
+  touchSwapSticks?: boolean;
+  touchLeftHanded?: boolean;
+  touchShowDpad?: boolean;
+  touchShowFace?: boolean;
+  touchShowShoulders?: boolean;
+  touchShowCentre?: boolean;
+  touchShowLeftStick?: boolean;
+  touchShowRightStick?: boolean;
+  /** Show the floating "tune" button while streaming */
+  touchShowTuneButton?: boolean;
+  /** JSON blob with dragged cluster positions */
+  touchCustomPositions?: string;
 }
 
 export interface LoginProvider {
@@ -363,6 +402,8 @@ export interface OpenNowApi {
   getSettings(): Promise<Settings>;
   setSetting<K extends keyof Settings>(key: K, value: Settings[K]): Promise<void>;
   resetSettings(): Promise<Settings>;
-  /** Set device screen orientation */
-  setOrientation(mode: string): Promise<void>;
+  /** Set device screen orientation (Android / Capacitor only) */
+  setOrientation?(mode: string): Promise<void>;
+  /** Measure TCP ping to region endpoints (Android / Capacitor only) */
+  pingRegions?(urls: string[]): Promise<{ results: Record<string, number> }>;
 }
