@@ -1,144 +1,135 @@
-# OpenNOW - Android
+# WiredGram
 
-Unofficial GeForce NOW client for Android, built with Capacitor + React + WebRTC.
+**Настоящий клиент Telegram** (MTProto, через `teleproto`) в мобильном интерфейсе,
+который собирается в установочный **APK** через Capacitor.
 
----
-
-> **Warning**  
-> OpenNOW is under active development. Bugs and performance issues are expected while features are finalized.
-
-> **Trademark & Affiliation Notice**  
-> OpenNOW is an independent community project and is **not affiliated with, endorsed by, or sponsored by NVIDIA Corporation**.  
-> **NVIDIA** and **GeForce NOW** are trademarks of NVIDIA Corporation. You must use your own GeForce NOW account.
-
----
-
-## Prerequisites
-
-| Tool | Version | Notes |
-|------|---------|-------|
-| Node.js | 18 or newer | https://nodejs.org |
-| Android Studio | Hedgehog or newer | https://developer.android.com/studio |
-| Android SDK | API 36 (compile), API 24 (min) | Install via SDK Manager in Android Studio |
-| JDK | 17 | Bundled with Android Studio |
-| ADB | any | Part of Android SDK platform-tools |
-
-After installing Android Studio, open it once and let it finish the initial SDK setup.
-
-Add ADB to your PATH so it works from a terminal:
-
-```powershell
-# Add to your PowerShell profile or system environment variables
-$env:PATH += ";$env:LOCALAPPDATA\Android\Sdk\platform-tools"
+```
+wiredgram/                     ← Vite + React 19 + TypeScript клиент
+wiredgram/android/             ← Capacitor-проект, из него собирается APK
+.github/workflows/android-apk.yml  ← CI: npm ci → vite build → cap sync → gradlew assembleDebug → APK
+backup/                        ← zip-архив предыдущего проекта OpenNOW (локально, вне git)
 ```
 
----
+## APK
 
-## First time setup
+Готовый APK приходит артефактом **`wiredgram-apk`** из workflow `android-apk`
+(Actions → android-apk → последний запуск → Artifacts). APK debug-подписан, ставится на любой
+Android 7.0+ (minSdk 24) как обычное приложение `app.wiredgram.client` («WiredGram»).
 
-```powershell
-cd opennow-stable
+Локально, если есть JDK 21 и Android SDK:
+
+```bash
+cd wiredgram
 npm install
+npm run apk        # build → cap sync → gradlew assembleDebug
+# → android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The `android/` folder is already checked in. You do not need to run `cap init` or `cap add android`.
+## Запуск в браузере
 
----
-
-## Build and install
-
-### Step 1 - Build the web bundle
-
-```powershell
-npm run build
+```bash
+cd wiredgram
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # tsc --noEmit + production-сборка
+npm run preview    # собранный бандл
 ```
 
-### Step 2 - Sync web assets into the Android project
+## Вход
 
-```powershell
-npx cap sync android
+На экране авторизации есть переключатель **Демо / Telegram**:
+
+- **Telegram** — настоящий вход: номер → код из Telegram/SMS → облачный пароль 2FA.
+  Дальше подтягиваются ваши диалоги, история, медиа и live-обновления (`NewMessage`).
+  Сессия MTProto хранится в IndexedDB; `api_id`/`api_hash` можно заменить в настройках
+  (по умолчанию — публичные ключи Telegram Web K: `2040`).
+- **Демо** — офлайн-данные для показа интерфейса без сети.
+
+Демо-вход
+
+| Шаг | Значение |
+|-----|----------|
+| Телефон | любой номер, минимум 8 цифр |
+| Код из SMS | `12345` |
+| Пароль 2FA | `wiredgram` |
+
+Есть кнопка «Войти как гость» — попасть внутрь без формы.
+
+## Что внутри
+
+**Telegram (MTProto)**
+- Настоящий `TelegramClient` из `teleproto`, подгружается лениво отдельным чанком —
+  демо-режим не платит за 420 КБ MTProto-кода.
+- Вход: `auth.sendCode` → `auth.signIn` → SRP-пароль (`signInWithPassword`), без пересылки кода при опечатке.
+- Диалоги (`messages.getDialogs`), история (`getMessages`), отправка текста и файлов, отметки о прочтении.
+- Медиа скачивается по требованию (`downloadMedia` → Blob в IndexedDB), аватары — в фоне с лимитом 3 параллельных.
+- Живые обновления через `NewMessage`; профиль обновляется через `account.updateProfile` (с дебаунсом).
+
+**Авторизация**
+- Ввод номера с выбором кода страны и автоформатированием.
+- OTP-код: 5 ячеек, автопереход, вставка из буфера, повторная отправка с таймером.
+- Второй фактор: пароль, показ/скрытие, понятные ошибки.
+- Транспорт вынесен в `src/state/auth.ts` (демо) и `src/state/telegram.ts` (реальный MTProto).
+
+**Чаты**
+- 10 демо-диалогов с русским контентом, непрочитанными, закрепами, «без звука».
+- Поиск по названиям и тексту сообщений.
+- Экран чата: разделители по дням, статусы ✓/✓✓, индикатор «печатает…», автоответы.
+- Вложения: фото, GIF, видео (с проигрыванием), файлы — через IndexedDB, лимит 64 МБ.
+- Долгое нажатие на сообщение → панель реакций.
+- Меню чата: закрепить, отключить уведомления, очистить историю.
+- Кнопка «вниз», автопрокрутка, окно рендера по 60 сообщений.
+
+**Профиль**
+- Загрузка аватара, имя, username, био, статистика.
+- Фон профиля и чатов: градиент, фото, GIF или **видео** (`autoplay muted loop playsinline`).
+- Прозрачность, размытие, затемнение, режим заполнения, анимация.
+- 6 готовых градиентов + предпросмотр с «живыми» бабблами.
+
+**Настройки**
+- Темы: тёмная, AMOLED, светлая. 6 акцентов.
+- Крупный текст, анимации, экономия трафика, отправка по Enter.
+- Lite-режим: отключает `backdrop-filter` и эффекты.
+- Хранилище: подсчёт занятого места и очистка медиа-кэша.
+- Выход из аккаунта.
+
+## Почему это быстро
+
+- Основной бандл **~93 КБ gzip JS + 6.5 КБ CSS**; MTProto-клиент — отдельные ленивые чанки.
+- Иконки — инлайновые SVG-пути (`src/components/Icon.tsx`), без иконочных шрифтов и lucide.
+- Один CSS-файл на CSS-переменных: темы переключаются атрибутом `data-theme`, а не JS.
+- Состояние — один `useSyncExternalStore`-стор, запись в IndexedDB с дебаунсом 350 мс.
+- Медиа — `Blob` в IndexedDB + LRU-кэш объектных URL (64 записи), изображения `loading="lazy"`.
+- Демо-фото рисуются на canvas и хранятся локально — в бандле нет ни одной картинки.
+- Список чатов использует `content-visibility: auto`; экран чата рендерит окно из 60 сообщений.
+- Демо-режим полностью офлайн; в Telegram-режиме сеть нужна только для MTProto.
+
+## Структура
+
+```
+wiredgram/
+├─ index.html
+├─ public/                manifest, иконка
+└─ src/
+   ├─ App.tsx             роутинг, темы, splash
+   ├─ styles.css          дизайн-система (~1700 строк, один файл)
+   ├─ types.ts            доменные типы
+   ├─ state/
+   │  ├─ auth.ts          транспорт демо-авторизации
+   │  ├─ telegram.ts      реальный MTProto-клиент: вход, диалоги, медиа, апдейты
+   │  ├─ store.ts         состояние + действия + персист + мост в Telegram
+   │  └─ seed.ts          демо-данные
+   ├─ lib/
+   │  ├─ db.ts            IndexedDB: kv + blobs
+   │  ├─ media.ts         файлы, объектные URL, canvas-фото
+   │  └─ format.ts        русские даты, байты, длительности
+   ├─ components/         Avatar, Icon, Wallpaper, Sheet, Slider, Toasts, BottomNav
+   └─ screens/            Auth (телефон → OTP → 2FA), Chats, Chat, Profile, Settings
 ```
 
-Copies `dist/` into the Android project and updates Capacitor plugins.
-Run this every time after `npm run build`.
+## Бэкап предыдущего проекта
 
-### Step 3 - Build the APK
-
-```powershell
-cd android
-.\gradlew assembleDebug
-```
-
-Output: `android/app/build/outputs/apk/debug/app-debug.apk`
-
-### Step 4 - Install on device
-
-Make sure your device is connected with USB debugging enabled.
-
-```powershell
-# Check device is visible
-adb devices
-
-# Uninstall old version first (avoids signature mismatch errors)
-adb uninstall com.zortos.opennow
-
-# Install
-adb install app\build\outputs\apk\debug\app-debug.apk
-```
-
----
-
-## Quick rebuild (after any code change)
-
-Run all steps from the project root:
-
-```powershell
-cd opennow-stable
-npm run build
-npx cap sync android
-cd android
-.\gradlew assembleDebug
-adb uninstall com.zortos.opennow
-adb install app\build\outputs\apk\debug\app-debug.apk
-```
-
----
-
-## Open in Android Studio
-
-```powershell
-npx cap open android
-```
-
-Or open the `android/` folder directly in Android Studio.
-
----
-
-## Logcat (debug output)
-
-```powershell
-# Live output filtered to app logs
-adb logcat | Select-String "Capacitor|chromium|WebRTC|GfnPlugin"
-
-# Last 200 lines then exit
-adb logcat -d | Select-String "Capacitor|Console|error" | Select-Object -Last 200
-```
-
----
-
-## Android details
-
-- App ID: `com.zortos.opennow`
-- Min SDK: API 24 (Android 7.0)
-- Target/Compile SDK: API 36
-
-## How it works
-
-| Feature | Implementation |
-|---------|---------------|
-| Auth (login) | Kotlin `GfnPlugin.kt` -- opens a WebView activity for NVIDIA OAuth PKCE. Tokens stored in `EncryptedSharedPreferences` |
-| Games API | Browser `fetch` running directly in the WebView -- no Kotlin involved |
-| Session management | Browser `fetch` running directly in the WebView -- no Kotlin involved |
-| Signaling | `BrowserSignalingClient` -- native WebSocket in the WebView -- no Kotlin involved |
-| WebRTC | Browser built-in WebRTC stack inside the WebView |
-| Settings | Kotlin `GfnPlugin.kt` -- stored in `SharedPreferences` |
+Исходный OpenNOW (Electron + Capacitor + Android CI) сохранён в
+`backup/opennow-android-2026-11-04.zip` — 184 файла, 2.8 МБ, включая `.github/workflows`,
+README и ассеты. Архив не попадает в git (см. `.gitignore`), но остаётся в рабочей папке;
+история git тоже содержит все прежние файлы.
