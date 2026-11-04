@@ -1,0 +1,18 @@
+{
+  "name": "WiredGram",
+  "short_name": "WiredGram",
+  "description": "A fast, beautiful messenger built for your phone.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07070a",
+  "theme_color": "#07070a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
