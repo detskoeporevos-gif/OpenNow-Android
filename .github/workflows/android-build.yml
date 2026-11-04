@@ -43,7 +43,9 @@ permissions:
 jobs:
   build:
     name: Build APK
-    runs-on: ubuntu-latest
+    # Pinned instead of ubuntu-latest so the preinstalled Android SDK path and
+    # JDK stay predictable across runner image migrations.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: opennow-stable
@@ -75,13 +77,26 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install required SDK packages
+      # The GitHub-hosted Ubuntu image already ships the Android SDK; just make
+      # sure the right platform/build-tools are present and expose the paths.
+      - name: Configure Android SDK
         run: |
-          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-          yes | sdkmanager --licenses > /dev/null || true
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_SDK_ROOT=$SDK_ROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+
+          SDKMGR="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMGR" ]; then
+            SDKMGR="$(command -v sdkmanager || true)"
+          fi
+          if [ -z "$SDKMGR" ] || [ ! -x "$SDKMGR" ]; then
+            echo "sdkmanager not found -- relying on the SDK bundled with the runner image"
+            exit 0
+          fi
+
+          yes | "$SDKMGR" --licenses > /dev/null 2>&1 || true
+          "$SDKMGR" --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" \
+            || echo "::warning::Could not install Android SDK packages; Gradle will report what is missing"
 
       - name: Setup Gradle (with build cache)
         uses: gradle/actions/setup-gradle@v4
