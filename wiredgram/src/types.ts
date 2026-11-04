@@ -13,6 +13,7 @@ export type Route =
 export type MediaKind = "image" | "gif" | "video" | "file";
 
 export interface MediaRef {
+  /** Empty while Telegram media has not been downloaded yet. */
   blobId: string;
   kind: MediaKind;
   name: string;
@@ -21,6 +22,8 @@ export interface MediaRef {
   width?: number;
   height?: number;
   duration?: number;
+  /** Set for Telegram attachments that still live on the server. */
+  remote?: { chatId: string; messageId: number };
 }
 
 export type MessageStatus = "sending" | "sent" | "read";
@@ -83,7 +86,13 @@ export interface Wallpaper {
 
 export type ThemeName = "dark" | "amoled" | "light";
 
+/** demo = local demo dataset, telegram = real MTProto account. */
+export type Connection = "demo" | "telegram";
+
 export interface Settings {
+  connection: Connection;
+  tgApiId: number;
+  tgApiHash: string;
   theme: ThemeName;
   accent: string;
   /** Disables blur/backdrop filters and long animations. */

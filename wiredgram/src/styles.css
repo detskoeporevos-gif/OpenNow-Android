@@ -1778,3 +1778,17 @@ textarea {
   30%, 50%, 70% { transform: translateX(-6px); }
   40%, 60% { transform: translateX(6px); }
 }
+
+/* Telegram attachments that still live on the server */
+.bubble__remote {
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  border: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: 12px;
+  transition: background 140ms var(--ease);
+}
+.bubble__remote:active {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}

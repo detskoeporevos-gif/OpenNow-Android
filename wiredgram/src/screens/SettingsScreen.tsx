@@ -7,7 +7,9 @@ import { clearBlobs } from "../lib/db";
 import { formatBytes } from "../lib/format";
 import {
   ACCENTS,
+  reconnectTelegram,
   refreshStorage,
+  setConnection,
   signOut,
   toast,
   updateSettings,
@@ -63,7 +65,7 @@ function Toggle({
 }
 
 export function SettingsScreen(): JSX.Element {
-  const { settings, profile, storageBytes } = useStore();
+  const { settings, profile, storageBytes, tgStage, tgMe } = useStore();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const bundle = useBundleSize();
 
@@ -185,6 +187,67 @@ export function SettingsScreen(): JSX.Element {
           </div>
         </div>
 
+        <div className="section-title">Подключение</div>
+        <div className="group">
+          <div className="row" style={{ flexDirection: "column", alignItems: "stretch", gap: 10 }}>
+            <span className="label">Источник данных</span>
+            <div className="segment">
+              <button data-active={settings.connection === "demo"} onClick={() => void setConnection("demo")}>
+                Демо
+              </button>
+              <button data-active={settings.connection === "telegram"} onClick={() => void setConnection("telegram")}>
+                Telegram
+              </button>
+            </div>
+            <span className="row__sub">
+              {settings.connection === "telegram"
+                ? tgStage === "ready"
+                  ? `MTProto подключён${tgMe ? ` · @${tgMe.username || tgMe.name}` : ""}`
+                  : tgStage === "connecting"
+                    ? "Подключаемся к Telegram…"
+                    : tgStage === "error"
+                      ? "Ошибка подключения — проверьте сеть"
+                      : "Нужен вход в аккаунт Telegram"
+                : "Локальные демо-данные, сеть не используется"}
+            </span>
+          </div>
+
+          <label className="field-row">
+            <span className="label">api_id</span>
+            <input
+              inputMode="numeric"
+              value={String(settings.tgApiId)}
+              onChange={(e) => updateSettings({ tgApiId: Number(e.target.value.replace(/\D+/g, "")) || 0 })}
+            />
+          </label>
+          <label className="field-row">
+            <span className="label">api_hash</span>
+            <input
+              value={settings.tgApiHash}
+              onChange={(e) => updateSettings({ tgApiHash: e.target.value.trim() })}
+              spellCheck={false}
+            />
+          </label>
+
+          <button
+            className="btn btn--ghost btn--block"
+            onClick={() => {
+              if (settings.connection !== "telegram") {
+                toast("Сначала переключитесь на Telegram", "info");
+                return;
+              }
+              void reconnectTelegram().then(() => toast("Переподключение завершено", "ok"));
+            }}
+          >
+            <Icon name="bolt" size={18} /> Переподключиться
+          </button>
+
+          <p className="hint">
+            Свои api_id и api_hash можно получить на my.telegram.org. По умолчанию используются
+            публичные ключи Telegram Web. Сессия MTProto хранится в IndexedDB устройства.
+          </p>
+        </div>
+
         <div className="section-title">Аккаунт</div>
         <div className="group">
           <div className="row">
@@ -198,7 +261,9 @@ export function SettingsScreen(): JSX.Element {
             <Icon name="shield" size={20} />
             <div className="row__body">
               <span className="row__title">Двухфакторная аутентификация</span>
-              <span className="row__sub">Пароль подтверждён при входе</span>
+              <span className="row__sub">
+                {settings.connection === "telegram" ? "Облачный пароль Telegram" : "Пароль подтверждён при входе"}
+              </span>
             </div>
             <span className="badge" style={{ background: "color-mix(in srgb, var(--ok) 22%, transparent)", color: "var(--ok)" }}>
               ON
@@ -215,7 +280,7 @@ export function SettingsScreen(): JSX.Element {
             <Icon name="bolt" size={20} />
             <div className="row__body">
               <span className="row__title">Вес интерфейса</span>
-              <span className="row__sub">{bundle} JS + CSS, без сторонних UI-библиотек</span>
+              <span className="row__sub">{bundle} JS + CSS, MTProto подгружается по требованию</span>
             </div>
           </div>
           <div className="row">
@@ -229,7 +294,11 @@ export function SettingsScreen(): JSX.Element {
             <Icon name="lock" size={20} />
             <div className="row__body">
               <span className="row__title">Приватность</span>
-              <span className="row__sub">Демо-режим: сообщения не покидают устройство</span>
+              <span className="row__sub">
+                {settings.connection === "telegram"
+                  ? "MTProto, сквозное шифрование Telegram, сессия только на устройстве"
+                  : "Демо-режим: сообщения не покидают устройство"}
+              </span>
             </div>
           </div>
         </div>

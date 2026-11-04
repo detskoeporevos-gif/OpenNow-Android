@@ -24,3 +24,9 @@ Thumbs.db
 # logs
 *.log
 npm-debug.log*
+
+# Capacitor generated web assets
+wiredgram/android/app/src/main/assets/public/
+wiredgram/android/app/src/main/assets/capacitor.config.json
+wiredgram/android/app/src/main/assets/capacitor.plugins.json
+wiredgram/artifacts/

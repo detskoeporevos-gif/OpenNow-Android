@@ -8,9 +8,11 @@ import { clockTime, dayLabel, formatBytes, formatDuration, sameDay } from "../li
 import { storeFile, useMediaUrl } from "../lib/media";
 import {
   clearChat,
+  downloadMedia,
   go,
   react,
   sendMessage,
+  syncHistory,
   toast,
   updateChat,
   useStore,
@@ -22,10 +24,63 @@ const REACTIONS = ["❤️", "👍", "🔥", "😂", "😮", "🙏"];
 
 /* ── bubble media ───────────────────────────────────────────────── */
 
-function BubbleMedia({ media }: { media: MediaRef }): JSX.Element | null {
-  const url = useMediaUrl(media.blobId);
+/** Telegram media lives on the server until the user (or auto-load) pulls it. */
+function RemoteMedia({
+  media,
+  messageId,
+  onDownload,
+}: {
+  media: MediaRef;
+  messageId: string;
+  onDownload: (messageId: string) => void;
+}): JSX.Element {
+  const { settings } = useStore();
+  const size = media.size ? formatBytes(media.size) : "";
+  const [busy, setBusy] = useState(false);
+  const requested = useRef(false);
+
+  useEffect(() => {
+    if (!media.remote || requested.current) return;
+    if (media.kind !== "image" || settings.dataSaver) return;
+    requested.current = true;
+    setBusy(true);
+    void Promise.resolve(onDownload(messageId)).finally(() => setBusy(false));
+  }, [media.kind, media.remote, messageId, onDownload, settings.dataSaver]);
+
+  const label = media.kind === "video" ? "Видео" : media.kind === "file" ? media.name : "Фото";
+
+  return (
+    <button
+      className="bubble__file bubble__remote"
+      type="button"
+      onClick={() => {
+        if (busy) return;
+        setBusy(true);
+        void Promise.resolve(onDownload(messageId)).finally(() => setBusy(false));
+      }}
+    >
+      <Icon name={media.kind === "video" ? "video" : media.kind === "file" ? "storage" : "image"} size={22} />
+      <div className="bubble__file-meta">
+        <strong>{label}</strong>
+        <span>{busy ? "загружаем…" : size ? `${size} · нажмите` : "нажмите, чтобы загрузить"}</span>
+      </div>
+    </button>
+  );
+}
+
+function BubbleMedia({
+  media,
+  messageId,
+  onDownload,
+}: {
+  media: MediaRef;
+  messageId: string;
+  onDownload: (messageId: string) => void;
+}): JSX.Element | null {
+  const url = useMediaUrl(media.blobId || undefined);
 
   if (!url) {
+    if (media.remote) return <RemoteMedia media={media} messageId={messageId} onDownload={onDownload} />;
     return (
       <div className="bubble__file">
         <Icon name="image" size={22} />
@@ -69,9 +124,11 @@ function BubbleMedia({ media }: { media: MediaRef }): JSX.Element | null {
 function Bubble({
   message,
   onOpenReactions,
+  onDownload,
 }: {
   message: Message;
   onOpenReactions: (message: Message, x: number, y: number) => void;
+  onDownload: (messageId: string) => void;
 }): JSX.Element {
   const holdRef = useRef<number | undefined>(undefined);
   const out = message.from === "me";
@@ -97,7 +154,7 @@ function Bubble({
       onPointerCancel={cancel}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {message.media && <BubbleMedia media={message.media} />}
+      {message.media && <BubbleMedia media={message.media} messageId={message.id} onDownload={onDownload} />}
       {message.text && <div className="bubble__text">{message.text}</div>}
       <div className="bubble__foot">
         {message.media?.kind === "video" && message.media.duration
@@ -142,6 +199,15 @@ export function ChatScreen({ chatId }: { chatId: string }): JSX.Element {
   useEffect(() => {
     if (!chat) go({ name: "chats" });
   }, [chat]);
+
+  /* pull the real Telegram history the first time this chat is opened */
+  useEffect(() => {
+    void syncHistory(chatId);
+  }, [chatId]);
+
+  const handleDownload = useCallback((messageId: string) => {
+    void downloadMedia(chatId, messageId);
+  }, [chatId]);
 
   /* keep the view pinned to the newest message */
   useLayoutEffect(() => {
@@ -257,7 +323,7 @@ export function ChatScreen({ chatId }: { chatId: string }): JSX.Element {
           return (
             <div key={message.id} style={{ display: "contents" }}>
               {showDay && <div className="day">{dayLabel(message.ts)}</div>}
-              <Bubble message={message} onOpenReactions={openReactions} />
+              <Bubble message={message} onOpenReactions={openReactions} onDownload={handleDownload} />
             </div>
           );
         })}

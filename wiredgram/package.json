@@ -2,19 +2,26 @@
   "name": "wiredgram",
   "private": true,
   "version": "0.1.0",
-  "description": "WiredGram — a hyper-light Telegram-style messenger for your phone",
+  "description": "WiredGram — Telegram (MTProto) client for Android, built with React + Capacitor",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "preview": "vite preview --host 0.0.0.0 --port 5173 --strictPort"
+    "preview": "vite preview --host 0.0.0.0 --port 5173 --strictPort",
+    "sync": "npm run build && cap sync android",
+    "apk": "npm run sync && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "telegram": "^2.26.22",
+    "teleproto": "^1.232.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.4",

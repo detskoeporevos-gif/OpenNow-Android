@@ -2,7 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { JSX } from "react";
 import { Icon } from "../components/Icon";
 import { COUNTRIES, DEMO_CODE, DEMO_PASSWORD, transport } from "../state/auth";
-import { signIn, toast } from "../state/store";
+import {
+  signIn,
+  startTelegramLogin,
+  submitTelegramCode,
+  submitTelegramPassword,
+  toast,
+  updateSettings,
+  useStore,
+} from "../state/store";
+import type { Connection } from "../types";
 
 type Step = "phone" | "code" | "password";
 
@@ -24,11 +33,14 @@ function formatPhone(digitsValue: string): string {
 }
 
 export function AuthScreen(): JSX.Element {
+  const { settings } = useStore();
+  const [mode, setMode] = useState<Connection>(settings.connection);
   const [step, setStep] = useState<Step>("phone");
   const [country, setCountry] = useState(COUNTRIES[0].code);
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [pinHint, setPinHint] = useState<string | undefined>();
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +50,7 @@ export function AuthScreen(): JSX.Element {
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
 
   const fullPhone = useMemo(() => `${country}${phone.replace(/\D+/g, "")}`, [country, phone]);
+  const isTg = mode === "telegram";
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -53,6 +66,22 @@ export function AuthScreen(): JSX.Element {
   const requestCode = useCallback(async () => {
     setError(null);
     setBusy(true);
+
+    if (isTg) {
+      const result = await startTelegramLogin(fullPhone);
+      setBusy(false);
+      if (!result.ok) {
+        fail(result.error ?? "Telegram не принял номер.");
+        return;
+      }
+      setStep("code");
+      setCode("");
+      setResendIn(RESEND_SECONDS);
+      toast(result.viaApp ? "Код отправлен в приложение Telegram" : "Код отправлен по SMS", "ok");
+      window.setTimeout(() => otpRefs.current[0]?.focus(), 60);
+      return;
+    }
+
     const result = await transport.requestCode(fullPhone);
     setBusy(false);
     if (!result.ok) {
@@ -64,17 +93,34 @@ export function AuthScreen(): JSX.Element {
     setResendIn(RESEND_SECONDS);
     toast(`Код отправлен на ${fullPhone}`, "ok");
     window.setTimeout(() => otpRefs.current[0]?.focus(), 60);
-  }, [fail, fullPhone]);
+  }, [fail, fullPhone, isTg]);
 
   const verifyCode = useCallback(
     async (value: string) => {
       if (busy) return;
       if (value.length < CODE_LEN) {
-        fail("Введите все 5 цифр кода.");
+        fail(`Введите все ${CODE_LEN} цифр кода.`);
         return;
       }
       setBusy(true);
       setError(null);
+
+      if (isTg) {
+        const result = await submitTelegramCode(value);
+        setBusy(false);
+        if (!result.ok) {
+          fail(result.error ?? "Telegram отклонил код.");
+          setCode("");
+          otpRefs.current[0]?.focus();
+          return;
+        }
+        if (result.needsPassword) {
+          setPinHint(result.hint);
+          setStep("password");
+        }
+        return;
+      }
+
       const result = await transport.verifyCode(fullPhone, value);
       setBusy(false);
       if (!result.ok) {
@@ -85,13 +131,21 @@ export function AuthScreen(): JSX.Element {
       }
       setStep("password");
     },
-    [busy, fail, fullPhone],
+    [busy, fail, fullPhone, isTg],
   );
 
   const verifyPassword = useCallback(async () => {
     if (busy) return;
     setBusy(true);
     setError(null);
+
+    if (isTg) {
+      const result = await submitTelegramPassword(password);
+      setBusy(false);
+      if (!result.ok) fail(result.error ?? "Telegram отклонил пароль.");
+      return;
+    }
+
     const result = await transport.verifyPassword(password);
     if (!result.ok) {
       setBusy(false);
@@ -104,7 +158,7 @@ export function AuthScreen(): JSX.Element {
       phone: fullPhone,
       createdAt: Date.now(),
     });
-  }, [busy, fail, fullPhone, password]);
+  }, [busy, fail, fullPhone, isTg, password]);
 
   const guest = useCallback(() => {
     void signIn({
@@ -114,6 +168,16 @@ export function AuthScreen(): JSX.Element {
       createdAt: Date.now(),
     });
   }, []);
+
+  const switchMode = (next: Connection): void => {
+    if (next === mode) return;
+    setMode(next);
+    updateSettings({ connection: next });
+    setStep("phone");
+    setCode("");
+    setPassword("");
+    setError(null);
+  };
 
   const onOtpChange = (index: number, raw: string): void => {
     const clean = raw.replace(/\D+/g, "");
@@ -167,13 +231,22 @@ export function AuthScreen(): JSX.Element {
         </div>
         <h1 className="auth__title">WiredGram</h1>
         <p className="auth__sub">
-          {step === "phone" && "Быстрый и лёгкий мессенджер. Войдите по номеру телефона."}
-          {step === "code" && "Мы отправили код подтверждения — введите 5 цифр."}
-          {step === "password" && "Аккаунт защищён двухфакторной аутентификацией."}
+          {step === "phone" && (isTg ? "Вход в настоящий аккаунт Telegram по номеру телефона." : "Быстрый и лёгкий мессенджер. Войдите по номеру телефона.")}
+          {step === "code" && (isTg ? "Telegram отправил код — введите его ниже." : "Мы отправили код подтверждения — введите 5 цифр.")}
+          {step === "password" && (isTg ? "Аккаунт защищён облачным паролем (2FA)." : "Аккаунт защищён двухфакторной аутентификацией.")}
         </p>
       </div>
 
       <div className="auth__card" key={`card-${step}`} data-shake={shake}>
+        <div className="segment" style={{ marginBottom: 4 }}>
+          <button data-active={!isTg} onClick={() => switchMode("demo")} type="button">
+            Демо
+          </button>
+          <button data-active={isTg} onClick={() => switchMode("telegram")} type="button">
+            Telegram
+          </button>
+        </div>
+
         <div className="auth__steps">
           <span className="auth__dot" data-active={step === "phone"} />
           <span className="auth__dot" data-active={step === "code"} />
@@ -181,7 +254,12 @@ export function AuthScreen(): JSX.Element {
         </div>
 
         {step !== "phone" && (
-          <button className="btn btn--ghost" style={{ height: 36, alignSelf: "flex-start", padding: "0 12px", fontSize: "0.8rem" }} onClick={onBack}>
+          <button
+            className="btn btn--ghost"
+            style={{ height: 36, alignSelf: "flex-start", padding: "0 12px", fontSize: "0.8rem" }}
+            onClick={onBack}
+            type="button"
+          >
             <Icon name="back" size={16} /> Назад
           </button>
         )}
@@ -216,17 +294,23 @@ export function AuthScreen(): JSX.Element {
               </div>
             </div>
 
-            <button className="btn btn--primary btn--block" disabled={busy} onClick={() => void requestCode()}>
-              {busy ? "Отправляем…" : "Получить код"}
+            <button className="btn btn--primary btn--block" disabled={busy} onClick={() => void requestCode()} type="button">
+              {busy ? "Отправляем…" : isTg ? "Получить код в Telegram" : "Получить код"}
               {!busy && <Icon name="next" size={18} />}
             </button>
 
-            <button className="btn btn--ghost btn--block" onClick={guest}>
-              Войти как гость
-            </button>
+            {!isTg && (
+              <button className="btn btn--ghost btn--block" onClick={guest} type="button">
+                Войти как гость
+              </button>
+            )}
 
             <p className="hint" style={{ textAlign: "center" }}>
-              Демо-режим: подойдёт любой номер, код <b>12345</b>, пароль 2FA <b>wiredgram</b>.
+              {isTg ? (
+                <>Реальный клиент MTProto: сообщения идут напрямую в Telegram. Код придёт в Telegram или по SMS.</>
+              ) : (
+                <>Демо-режим: подойдёт любой номер, код <b>12345</b>, пароль 2FA <b>wiredgram</b>.</>
+              )}
             </p>
           </>
         )}
@@ -234,7 +318,7 @@ export function AuthScreen(): JSX.Element {
         {step === "code" && (
           <>
             <div className="field">
-              <span className="label">Код из сообщения</span>
+              <span className="label">{isTg ? "Код из Telegram" : "Код из сообщения"}</span>
               <div className="otp">
                 {Array.from({ length: CODE_LEN }).map((_, index) => (
                   <input
@@ -255,11 +339,18 @@ export function AuthScreen(): JSX.Element {
               </div>
             </div>
 
-            <span className="code-hint">
-              <Icon name="shield" size={14} /> Демо-код: {DEMO_CODE}
-            </span>
+            {!isTg && (
+              <span className="code-hint">
+                <Icon name="shield" size={14} /> Демо-код: {DEMO_CODE}
+              </span>
+            )}
 
-            <button className="btn btn--primary btn--block" disabled={busy || code.length < CODE_LEN} onClick={() => void verifyCode(code)}>
+            <button
+              className="btn btn--primary btn--block"
+              disabled={busy || code.length < CODE_LEN}
+              onClick={() => void verifyCode(code)}
+              type="button"
+            >
               {busy ? "Проверяем…" : "Подтвердить"}
             </button>
 
@@ -267,6 +358,7 @@ export function AuthScreen(): JSX.Element {
               className="btn btn--ghost btn--block"
               disabled={resendIn > 0 || busy}
               onClick={() => void requestCode()}
+              type="button"
             >
               {resendIn > 0 ? `Отправить снова через ${resendIn} с` : "Отправить код снова"}
             </button>
@@ -276,7 +368,7 @@ export function AuthScreen(): JSX.Element {
         {step === "password" && (
           <>
             <div className="field">
-              <span className="label">Пароль двухфакторной аутентификации</span>
+              <span className="label">{isTg ? "Облачный пароль" : "Пароль двухфакторной аутентификации"}</span>
               <div className="input-wrap">
                 <Icon name="lock" size={18} />
                 <input
@@ -301,11 +393,23 @@ export function AuthScreen(): JSX.Element {
               </div>
             </div>
 
-            <span className="code-hint">
-              <Icon name="shield" size={14} /> Демо-пароль: {DEMO_PASSWORD}
-            </span>
+            {isTg && pinHint && (
+              <span className="code-hint">
+                <Icon name="shield" size={14} /> Подсказка Telegram: {pinHint}
+              </span>
+            )}
+            {!isTg && (
+              <span className="code-hint">
+                <Icon name="shield" size={14} /> Демо-пароль: {DEMO_PASSWORD}
+              </span>
+            )}
 
-            <button className="btn btn--primary btn--block" disabled={busy || password.length < 4} onClick={() => void verifyPassword()}>
+            <button
+              className="btn btn--primary btn--block"
+              disabled={busy || password.length < 1}
+              onClick={() => void verifyPassword()}
+              type="button"
+            >
               {busy ? "Входим…" : "Войти в аккаунт"}
               {!busy && <Icon name="check" size={18} />}
             </button>
@@ -320,7 +424,9 @@ export function AuthScreen(): JSX.Element {
       </div>
 
       <p className="auth__foot">
-        WiredGram · демо-клиент · данные хранятся только на этом устройстве
+        {isTg
+          ? "WiredGram · MTProto · сессия хранится только на этом устройстве"
+          : "WiredGram · демо-клиент · данные хранятся только на этом устройстве"}
       </p>
     </div>
   );
