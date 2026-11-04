@@ -20,7 +20,7 @@ Unofficial GeForce NOW client for Android, built with Capacitor + React + WebRTC
 | Node.js | 18 or newer | https://nodejs.org |
 | Android Studio | Hedgehog or newer | https://developer.android.com/studio |
 | Android SDK | API 36 (compile), API 24 (min) | Install via SDK Manager in Android Studio |
-| JDK | 17 | Bundled with Android Studio |
+| JDK | 21 | Required by Capacitor 8 (Android Studio Ladybug+ bundles it) |
 | ADB | any | Part of Android SDK platform-tools |
 
 After installing Android Studio, open it once and let it finish the initial SDK setup.
@@ -213,6 +213,9 @@ It performs the exact steps from the manual build section:
 ```
 npm ci   ->   npm run build   ->   npx cap sync android   ->   ./gradlew assembleDebug / assembleRelease
 ```
+
+CI uses **JDK 21** on `ubuntu-24.04` because Capacitor 8 compiles Android modules with
+`--release 21` (JDK 17 fails with `invalid source release: 21`).
 
 Artifacts are attached to the run as `opennow-android-apk`
 (`OpenNOW-<version>-debug.apk` and `OpenNOW-<version>-release.apk`).
